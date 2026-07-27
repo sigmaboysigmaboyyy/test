@@ -1,7 +1,7 @@
 {
   "name": "friend-messenger",
   "version": "1.0.0",
-  "description": "Simple private real-time messenger for friends",
+  "description": "Whisper Messenger Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,8 +11,6 @@
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "express": "^4.19.2",
-    "socket.io": "^4.7.5",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^6.0.1"
+    "socket.io": "^4.7.5"
   }
 }
