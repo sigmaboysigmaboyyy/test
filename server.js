@@ -413,10 +413,12 @@ io.on('connection', (socket) => {
 });
 
 // Start Server after DB init
-initDB().then(() => {
+initDB().then((database) => {
+  db = database;
   server.listen(PORT, () => {
     console.log(`\n==================================================`);
     console.log(`🚀 Whisper Platform running on http://localhost:${PORT}`);
     console.log(`==================================================\n`);
   });
 });
+
