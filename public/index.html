@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Whisper — Private Realtime Messenger</title>
+  <title>Whisper — Direct Messages & Servers</title>
   <!-- Google Fonts & Font Awesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,25 +13,34 @@
 </head>
 <body>
   <div id="app" class="app-container">
-    
-    <!-- JOIN MODAL -->
-    <div id="joinModal" class="modal-overlay">
-      <div class="modal-card">
+
+    <!-- AUTHENTICATION MODAL (LOGIN / REGISTER) -->
+    <div id="authModal" class="modal-overlay">
+      <div class="modal-card auth-card">
         <div class="brand-header">
           <div class="brand-logo">
-            <i class="fa-solid fa-comments-dollar-text"></i>
             <span>⚡ Whisper</span>
           </div>
-          <p class="brand-tagline">Private, instant end-to-end messaging for you and your friends.</p>
+          <p class="brand-tagline">Create an account to save your DMs and join servers.</p>
         </div>
 
-        <form id="joinForm" class="join-form">
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab active" id="tabLogin">Log In</button>
+          <button type="button" class="auth-tab" id="tabRegister">Register</button>
+        </div>
+
+        <form id="authForm" class="join-form">
           <div class="input-group">
-            <label for="usernameInput"><i class="fa-solid fa-user"></i> Your Nickname</label>
-            <input type="text" id="usernameInput" placeholder="e.g. Alex, Sam, Ghost" required maxlength="20" autocomplete="off">
+            <label for="authUsername"><i class="fa-solid fa-user"></i> Username</label>
+            <input type="text" id="authUsername" placeholder="e.g. Alex, Sam, Ghost" required minlength="2" maxlength="20" autocomplete="username">
           </div>
 
           <div class="input-group">
+            <label for="authPassword"><i class="fa-solid fa-lock"></i> Password</label>
+            <input type="password" id="authPassword" placeholder="••••••••" required minlength="4" autocomplete="current-password">
+          </div>
+
+          <div class="input-group hidden" id="avatarGroup">
             <label><i class="fa-solid fa-icons"></i> Choose Avatar</label>
             <div class="avatar-selector" id="avatarSelector">
               <span class="avatar-option selected" data-avatar="⚡">⚡</span>
@@ -45,81 +54,78 @@
             </div>
           </div>
 
-          <div class="input-group">
-            <label for="roomInput"><i class="fa-solid fa-key"></i> Secret Room Code</label>
-            <div class="room-input-wrapper">
-              <input type="text" id="roomInput" placeholder="e.g. duo-chat-88" required maxlength="30" autocomplete="off">
-              <button type="button" id="randomRoomBtn" title="Generate Random Room Key">
-                <i class="fa-solid fa-dice"></i>
-              </button>
-            </div>
-            <small class="field-hint">Share this key with your friend so you join the exact same chat room!</small>
-          </div>
+          <p class="error-msg hidden" id="authErrorMsg"></p>
 
-          <button type="submit" class="btn-primary start-chat-btn">
-            Enter Chat Room <i class="fa-solid fa-arrow-right"></i>
+          <button type="submit" class="btn-primary start-chat-btn" id="authSubmitBtn">
+            Log In <i class="fa-solid fa-arrow-right"></i>
           </button>
         </form>
       </div>
     </div>
 
-    <!-- MAIN CHAT INTERFACE -->
-    <div id="chatView" class="chat-view hidden">
-      <!-- SIDEBAR -->
+    <!-- MAIN PLATFORM LAYOUT (DISCORD-LIKE THREE COLUMNS) -->
+    <div id="mainLayout" class="main-layout hidden">
+      
+      <!-- 1. LEFTMOST SERVER RAIL -->
+      <nav class="server-rail">
+        <button class="rail-btn active" id="homeRailBtn" title="Direct Messages">
+          <i class="fa-solid fa-comments"></i>
+        </button>
+        
+        <div class="rail-divider"></div>
+
+        <div class="servers-scroll-list" id="serversRailList">
+          <!-- Dynamic Server Icons -->
+        </div>
+
+        <button class="rail-btn add-btn" id="openCreateServerBtn" title="Create a Server">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+        <button class="rail-btn join-btn" id="openJoinServerBtn" title="Join Server with Code">
+          <i class="fa-solid fa-compass"></i>
+        </button>
+      </nav>
+
+      <!-- 2. SECONDARY SIDEBAR (DMs LIST OR SERVER CHANNELS) -->
       <aside class="sidebar" id="sidebar">
+        <!-- Sidebar Header -->
         <div class="sidebar-header">
-          <div class="brand">
-            <span class="brand-icon">⚡</span>
-            <h2>Whisper</h2>
-          </div>
-          <button class="icon-btn mobile-close-sidebar" id="closeSidebarBtn">
-            <i class="fa-solid fa-xmark"></i>
+          <h2 id="sidebarTitle">Direct Messages</h2>
+          <button class="icon-btn" id="openNewDmBtn" title="New Direct Message">
+            <i class="fa-solid fa-user-plus"></i>
           </button>
         </div>
 
-        <div class="room-card">
-          <div class="room-label">CURRENT ROOM</div>
-          <div class="room-code-display">
-            <i class="fa-solid fa-lock"></i>
-            <span id="displayRoomName">secret-room</span>
-          </div>
-          <button class="btn-secondary copy-link-btn" id="copyLinkBtn">
-            <i class="fa-solid fa-link"></i> Copy Invite Link
-          </button>
-        </div>
-
+        <!-- DM Friends List / Server Channels List -->
         <div class="members-section">
-          <div class="section-title">ONLINE IN ROOM (<span id="userCount">0</span>)</div>
-          <ul class="users-list" id="usersList">
-            <!-- Dynamic Users -->
+          <ul class="nav-items-list" id="sidebarItemsList">
+            <!-- Dynamic DMs or Server Channels -->
           </ul>
         </div>
 
+        <!-- Sidebar Footer Profile Badge -->
         <div class="sidebar-footer">
           <div class="user-profile-badge">
             <span class="user-avatar" id="myAvatarDisplay">⚡</span>
             <div class="user-info">
               <span class="user-name" id="myNameDisplay">User</span>
-              <span class="status-indicator online">Connected</span>
+              <span class="status-indicator online">Online</span>
             </div>
           </div>
-          <button class="icon-btn leave-btn" id="leaveBtn" title="Leave Room">
+          <button class="icon-btn leave-btn" id="logoutBtn" title="Log Out">
             <i class="fa-solid fa-right-from-bracket"></i>
           </button>
         </div>
       </aside>
 
-      <!-- CHAT MAIN AREA -->
+      <!-- 3. PRIMARY CHAT & CALL STAGE AREA -->
       <main class="chat-main">
         <!-- CHAT HEADER -->
         <header class="chat-header">
           <div class="header-left">
-            <button class="icon-btn toggle-sidebar-btn" id="toggleSidebarBtn">
-              <i class="fa-solid fa-bars"></i>
-            </button>
             <div class="chat-title-info">
-              <h3 id="headerRoomTitle"># secret-chat</h3>
-              <p class="subtext" id="headerStatus">Direct encrypted connection ready</p>
+              <h3 id="headerTitle"># select-a-chat</h3>
+              <p class="subtext" id="headerSubtext">Direct message history saved</p>
             </div>
           </div>
 
@@ -136,28 +142,18 @@
             <button class="icon-btn" id="soundToggleBtn" title="Toggle Notifications Sound">
               <i class="fa-solid fa-volume-high" id="soundIcon"></i>
             </button>
-            <button class="icon-btn" id="headerShareBtn" title="Share Room Link">
-              <i class="fa-solid fa-share-nodes"></i>
-            </button>
           </div>
         </header>
 
-        <!-- DISCORD-STYLE INLINE CALL STAGE STREAMS -->
+        <!-- DISCORD-STYLE INLINE CALL STAGE -->
         <div id="callStage" class="discord-call-stage hidden">
-          <!-- Stage Status Bar -->
           <div class="stage-header">
             <div class="stage-info">
               <span class="status-dot"></span>
               <span id="callStageStatus">Voice Connected</span>
             </div>
-            <div class="stage-actions">
-              <button class="stage-icon-btn" id="toggleStageLayoutBtn" title="Toggle Stage Layout">
-                <i class="fa-solid fa-expand"></i>
-              </button>
-            </div>
           </div>
 
-          <!-- Stage Stream Cards Grid -->
           <div class="stage-grid" id="stageGrid">
             <!-- Remote Participant Stream / Avatar Tile -->
             <div class="stream-tile" id="remoteStreamTile">
@@ -182,7 +178,6 @@
             </div>
           </div>
 
-          <!-- Integrated Stage Control Dock -->
           <div class="stage-controls-dock">
             <button class="dock-btn" id="toggleMicBtn" title="Mute/Unmute Mic">
               <i class="fa-solid fa-microphone"></i>
@@ -201,13 +196,11 @@
 
         <!-- MESSAGES STREAM CONTAINER -->
         <div class="messages-container" id="messagesContainer">
-          <div class="chat-welcome-banner">
-            <div class="welcome-icon">🔒</div>
-            <h3>Welcome to your private room!</h3>
-            <p>Messages in this session are delivered instantly to everyone in room <strong id="welcomeRoomName">room</strong>.</p>
-            <p class="invite-tip">Send the room link to your friend to start chatting!</p>
+          <div class="chat-welcome-banner" id="welcomeBanner">
+            <div class="welcome-icon">💬</div>
+            <h3 id="welcomeTitle">Welcome to Whisper!</h3>
+            <p id="welcomeDesc">Select a Direct Message contact or join a server to start chatting.</p>
           </div>
-          <!-- Messages will be dynamically rendered here -->
         </div>
 
         <!-- TYPING INDICATOR BAR -->
@@ -237,12 +230,12 @@
           <form id="messageForm" class="message-form">
             <input type="file" id="fileInput" accept="image/*,.pdf,.doc,.docx,.txt" class="hidden">
             
-            <button type="button" class="icon-btn attach-btn" id="attachBtn" title="Attach image or file">
+            <button type="button" class="icon-btn attach-btn" id="attachBtn" title="Attach file">
               <i class="fa-solid fa-paperclip"></i>
             </button>
 
             <div class="input-wrapper">
-              <textarea id="messageInput" placeholder="Type a message to your friend..." rows="1" maxlength="1000"></textarea>
+              <textarea id="messageInput" placeholder="Type a message..." rows="1" maxlength="1000"></textarea>
             </div>
 
             <button type="submit" class="send-btn" id="sendBtn">
@@ -253,6 +246,62 @@
       </main>
     </div>
 
+    <!-- NEW DM MODAL -->
+    <div id="newDmModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>New Direct Message</h3>
+        <div class="input-group">
+          <input type="text" id="searchUserInput" placeholder="Search registered user by username...">
+        </div>
+        <ul class="user-search-results" id="userSearchResults"></ul>
+        <button type="button" class="btn-secondary" id="closeNewDmBtn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- CREATE SERVER MODAL -->
+    <div id="createServerModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>Create Your Server</h3>
+        <form id="createServerForm">
+          <div class="input-group">
+            <label>Server Name</label>
+            <input type="text" id="serverNameInput" placeholder="e.g. Squad Lounge" required maxlength="30">
+          </div>
+          <div class="input-group">
+            <label>Choose Server Icon Emoji</label>
+            <div class="avatar-selector" id="serverIconSelector">
+              <span class="avatar-option selected" data-icon="🛡️">🛡️</span>
+              <span class="avatar-option" data-icon="🚀">🚀</span>
+              <span class="avatar-option" data-icon="🎮">🎮</span>
+              <span class="avatar-option" data-icon="🎧">🎧</span>
+              <span class="avatar-option" data-icon="🔥">🔥</span>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="closeCreateServerBtn">Cancel</button>
+            <button type="submit" class="btn-primary">Create Server</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- JOIN SERVER MODAL -->
+    <div id="joinServerModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>Join Server with Invite Code</h3>
+        <form id="joinServerForm">
+          <div class="input-group">
+            <label>Server Invite Code</label>
+            <input type="text" id="joinInviteInput" placeholder="e.g. 7f3a9b1c" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="closeJoinServerBtn">Cancel</button>
+            <button type="submit" class="btn-primary">Join Server</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- INCOMING CALL MODAL -->
     <div id="incomingCallModal" class="modal-overlay hidden">
       <div class="modal-card call-modal-card">
@@ -261,7 +310,6 @@
         </div>
         <h3 id="callerNameDisplay">Friend</h3>
         <p id="callTypeLabel">Incoming Video Call...</p>
-
         <div class="call-action-btns">
           <button type="button" id="declineCallBtn" class="call-action-btn decline">
             <i class="fa-solid fa-phone-slash"></i> Decline
@@ -273,12 +321,10 @@
       </div>
     </div>
 
-
-
     <!-- TOAST NOTIFICATION -->
     <div id="toast" class="toast hidden">
       <i class="fa-solid fa-circle-check"></i>
-      <span id="toastMsg">Link copied to clipboard!</span>
+      <span id="toastMsg">Notification</span>
     </div>
   </div>
 
