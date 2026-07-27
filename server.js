@@ -14,6 +14,12 @@ const PORT = process.env.PORT || 3000;
 // Serve static assets from public folder
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Explicit fallback route for single-page app and query params
+app.get('/health', (req, res) => res.status(200).send('OK'));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // In-memory data store for active rooms and recent chat messages
 const rooms = new Map(); // roomID -> { users: Map(socketId -> userData), messages: [] }
 
