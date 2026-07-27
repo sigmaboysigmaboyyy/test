@@ -132,6 +132,46 @@ io.on('connection', (socket) => {
     }
   });
 
+  // WebRTC Signaling Handlers
+  socket.on('call_user', ({ targetSocketId, offer, callType }) => {
+    io.to(targetSocketId).emit('incoming_call', {
+      callerId: socket.id,
+      callerName: currentUser ? currentUser.username : 'Friend',
+      callerAvatar: currentUser ? currentUser.avatar : '⚡',
+      offer,
+      callType // 'audio' | 'video' | 'screen'
+    });
+  });
+
+  socket.on('answer_call', ({ targetSocketId, answer }) => {
+    io.to(targetSocketId).emit('call_accepted', {
+      responderId: socket.id,
+      answer
+    });
+  });
+
+  socket.on('ice_candidate', ({ targetSocketId, candidate }) => {
+    io.to(targetSocketId).emit('ice_candidate', {
+      senderId: socket.id,
+      candidate
+    });
+  });
+
+  socket.on('end_call', ({ targetSocketId }) => {
+    io.to(targetSocketId).emit('call_ended', {
+      senderId: socket.id
+    });
+  });
+
+  socket.on('toggle_media', ({ targetSocketId, mediaType, enabled }) => {
+    io.to(targetSocketId).emit('remote_media_toggled', {
+      senderId: socket.id,
+      mediaType,
+      enabled
+    });
+  });
+
+
   socket.on('disconnect', () => {
     if (currentRoom && rooms.has(currentRoom)) {
       const roomData = rooms.get(currentRoom);

@@ -124,6 +124,15 @@
           </div>
 
           <div class="header-actions">
+            <button class="icon-btn call-btn" id="startAudioCallBtn" title="Start Voice Call">
+              <i class="fa-solid fa-phone"></i>
+            </button>
+            <button class="icon-btn call-btn" id="startVideoCallBtn" title="Start Video Call">
+              <i class="fa-solid fa-video"></i>
+            </button>
+            <button class="icon-btn call-btn" id="startScreenShareBtn" title="Share Screen">
+              <i class="fa-solid fa-desktop"></i>
+            </button>
             <button class="icon-btn" id="soundToggleBtn" title="Toggle Notifications Sound">
               <i class="fa-solid fa-volume-high" id="soundIcon"></i>
             </button>
@@ -185,6 +194,62 @@
           </form>
         </div>
       </main>
+    </div>
+
+    <!-- INCOMING CALL MODAL -->
+    <div id="incomingCallModal" class="modal-overlay hidden">
+      <div class="modal-card call-modal-card">
+        <div class="call-avatar-pulse">
+          <span id="callerAvatarDisplay">⚡</span>
+        </div>
+        <h3 id="callerNameDisplay">Friend</h3>
+        <p id="callTypeLabel">Incoming Video Call...</p>
+
+        <div class="call-action-btns">
+          <button type="button" id="declineCallBtn" class="call-action-btn decline">
+            <i class="fa-solid fa-phone-slash"></i> Decline
+          </button>
+          <button type="button" id="acceptCallBtn" class="call-action-btn accept">
+            <i class="fa-solid fa-phone"></i> Accept
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVE CALL WINDOW OVERLAY -->
+    <div id="callOverlay" class="call-overlay hidden">
+      <div class="call-window">
+        <!-- Main Display (Remote Video or Screen Share) -->
+        <div class="video-container">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <div id="remoteAvatarFallback" class="remote-avatar-fallback hidden">
+            <span id="remoteCallAvatar">⚡</span>
+            <h4 id="remoteCallName">Friend</h4>
+            <span class="call-status-badge" id="callStatusBadge">Voice Connected</span>
+          </div>
+
+          <!-- Picture-in-Picture Local Video -->
+          <div class="pip-container" id="pipContainer">
+            <video id="localVideo" autoplay playsinline muted></video>
+          </div>
+        </div>
+
+        <!-- Call Control Bar -->
+        <div class="call-controls-bar">
+          <button class="call-control-btn" id="toggleMicBtn" title="Mute/Unmute Mic">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+          <button class="call-control-btn" id="toggleCamBtn" title="Turn Camera On/Off">
+            <i class="fa-solid fa-video"></i>
+          </button>
+          <button class="call-control-btn" id="toggleScreenShareBtn" title="Share/Stop Screen">
+            <i class="fa-solid fa-desktop"></i>
+          </button>
+          <button class="call-control-btn hangup" id="endCallBtn" title="End Call">
+            <i class="fa-solid fa-phone-slash"></i>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- TOAST NOTIFICATION -->
