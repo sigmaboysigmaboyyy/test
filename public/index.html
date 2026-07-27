@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Whisper — Private Realtime Messenger</title>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    
+    <!-- JOIN MODAL -->
+    <div id="joinModal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="brand-header">
+          <div class="brand-logo">
+            <i class="fa-solid fa-comments-dollar-text"></i>
+            <span>⚡ Whisper</span>
+          </div>
+          <p class="brand-tagline">Private, instant end-to-end messaging for you and your friends.</p>
+        </div>
+
+        <form id="joinForm" class="join-form">
+          <div class="input-group">
+            <label for="usernameInput"><i class="fa-solid fa-user"></i> Your Nickname</label>
+            <input type="text" id="usernameInput" placeholder="e.g. Alex, Sam, Ghost" required maxlength="20" autocomplete="off">
+          </div>
+
+          <div class="input-group">
+            <label><i class="fa-solid fa-icons"></i> Choose Avatar</label>
+            <div class="avatar-selector" id="avatarSelector">
+              <span class="avatar-option selected" data-avatar="⚡">⚡</span>
+              <span class="avatar-option" data-avatar="🦊">🦊</span>
+              <span class="avatar-option" data-avatar="🐱">🐱</span>
+              <span class="avatar-option" data-avatar="🚀">🚀</span>
+              <span class="avatar-option" data-avatar="👾">👾</span>
+              <span class="avatar-option" data-avatar="🔥">🔥</span>
+              <span class="avatar-option" data-avatar="💎">💎</span>
+              <span class="avatar-option" data-avatar="🎧">🎧</span>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="roomInput"><i class="fa-solid fa-key"></i> Secret Room Code</label>
+            <div class="room-input-wrapper">
+              <input type="text" id="roomInput" placeholder="e.g. duo-chat-88" required maxlength="30" autocomplete="off">
+              <button type="button" id="randomRoomBtn" title="Generate Random Room Key">
+                <i class="fa-solid fa-dice"></i>
+              </button>
+            </div>
+            <small class="field-hint">Share this key with your friend so you join the exact same chat room!</small>
+          </div>
+
+          <button type="submit" class="btn-primary start-chat-btn">
+            Enter Chat Room <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MAIN CHAT INTERFACE -->
+    <div id="chatView" class="chat-view hidden">
+      <!-- SIDEBAR -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="brand">
+            <span class="brand-icon">⚡</span>
+            <h2>Whisper</h2>
+          </div>
+          <button class="icon-btn mobile-close-sidebar" id="closeSidebarBtn">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="room-card">
+          <div class="room-label">CURRENT ROOM</div>
+          <div class="room-code-display">
+            <i class="fa-solid fa-lock"></i>
+            <span id="displayRoomName">secret-room</span>
+          </div>
+          <button class="btn-secondary copy-link-btn" id="copyLinkBtn">
+            <i class="fa-solid fa-link"></i> Copy Invite Link
+          </button>
+        </div>
+
+        <div class="members-section">
+          <div class="section-title">ONLINE IN ROOM (<span id="userCount">0</span>)</div>
+          <ul class="users-list" id="usersList">
+            <!-- Dynamic Users -->
+          </ul>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="user-profile-badge">
+            <span class="user-avatar" id="myAvatarDisplay">⚡</span>
+            <div class="user-info">
+              <span class="user-name" id="myNameDisplay">User</span>
+              <span class="status-indicator online">Connected</span>
+            </div>
+          </div>
+          <button class="icon-btn leave-btn" id="leaveBtn" title="Leave Room">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- CHAT MAIN AREA -->
+      <main class="chat-main">
+        <!-- CHAT HEADER -->
+        <header class="chat-header">
+          <div class="header-left">
+            <button class="icon-btn toggle-sidebar-btn" id="toggleSidebarBtn">
+              <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="chat-title-info">
+              <h3 id="headerRoomTitle"># secret-chat</h3>
+              <p class="subtext" id="headerStatus">Direct encrypted connection ready</p>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <button class="icon-btn" id="soundToggleBtn" title="Toggle Notifications Sound">
+              <i class="fa-solid fa-volume-high" id="soundIcon"></i>
+            </button>
+            <button class="icon-btn" id="headerShareBtn" title="Share Room Link">
+              <i class="fa-solid fa-share-nodes"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- MESSAGES STREAM CONTAINER -->
+        <div class="messages-container" id="messagesContainer">
+          <div class="chat-welcome-banner">
+            <div class="welcome-icon">🔒</div>
+            <h3>Welcome to your private room!</h3>
+            <p>Messages in this session are delivered instantly to everyone in room <strong id="welcomeRoomName">room</strong>.</p>
+            <p class="invite-tip">Send the room link to your friend to start chatting!</p>
+          </div>
+          <!-- Messages will be dynamically rendered here -->
+        </div>
+
+        <!-- TYPING INDICATOR BAR -->
+        <div class="typing-bar hidden" id="typingIndicator">
+          <div class="dots-bubble">
+            <span></span><span></span><span></span>
+          </div>
+          <span id="typingText">Friend is typing...</span>
+        </div>
+
+        <!-- ATTACHMENT PREVIEW CARD -->
+        <div class="attachment-preview-bar hidden" id="attachmentPreviewBar">
+          <div class="preview-content">
+            <img id="imagePreview" src="" alt="Attachment Preview" class="hidden">
+            <div id="filePreview" class="file-preview-box hidden">
+              <i class="fa-solid fa-file"></i>
+              <span id="fileName">file.pdf</span>
+            </div>
+          </div>
+          <button type="button" class="remove-attachment-btn" id="removeAttachmentBtn">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- INPUT BAR -->
+        <div class="input-area">
+          <form id="messageForm" class="message-form">
+            <input type="file" id="fileInput" accept="image/*,.pdf,.doc,.docx,.txt" class="hidden">
+            
+            <button type="button" class="icon-btn attach-btn" id="attachBtn" title="Attach image or file">
+              <i class="fa-solid fa-paperclip"></i>
+            </button>
+
+            <div class="input-wrapper">
+              <textarea id="messageInput" placeholder="Type a message to your friend..." rows="1" maxlength="1000"></textarea>
+            </div>
+
+            <button type="submit" class="send-btn" id="sendBtn">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </form>
+        </div>
+      </main>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="toast hidden">
+      <i class="fa-solid fa-circle-check"></i>
+      <span id="toastMsg">Link copied to clipboard!</span>
+    </div>
+  </div>
+
+  <!-- Socket.io Client -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

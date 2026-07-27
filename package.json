@@ -1,0 +1,14 @@
+{
+  "name": "friend-messenger",
+  "version": "1.0.0",
+  "description": "Simple private real-time messenger for friends",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
