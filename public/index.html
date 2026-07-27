@@ -142,6 +142,63 @@
           </div>
         </header>
 
+        <!-- DISCORD-STYLE INLINE CALL STAGE STREAMS -->
+        <div id="callStage" class="discord-call-stage hidden">
+          <!-- Stage Status Bar -->
+          <div class="stage-header">
+            <div class="stage-info">
+              <span class="status-dot"></span>
+              <span id="callStageStatus">Voice Connected</span>
+            </div>
+            <div class="stage-actions">
+              <button class="stage-icon-btn" id="toggleStageLayoutBtn" title="Toggle Stage Layout">
+                <i class="fa-solid fa-expand"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Stage Stream Cards Grid -->
+          <div class="stage-grid" id="stageGrid">
+            <!-- Remote Participant Stream / Avatar Tile -->
+            <div class="stream-tile" id="remoteStreamTile">
+              <span class="live-badge hidden" id="remoteLiveBadge"><i class="fa-solid fa-satellite-dish"></i> LIVE</span>
+              <video id="remoteVideo" autoplay playsinline></video>
+              <div id="remoteAvatarFallback" class="avatar-tile-fallback">
+                <span class="tile-avatar" id="remoteCallAvatar">⚡</span>
+                <span class="tile-username" id="remoteCallName">Friend</span>
+                <span class="tile-mute-badge" id="remoteMuteBadge"><i class="fa-solid fa-microphone-slash"></i></span>
+              </div>
+            </div>
+
+            <!-- Local Participant Stream / Avatar Tile -->
+            <div class="stream-tile" id="localStreamTile">
+              <span class="live-badge hidden" id="localLiveBadge"><i class="fa-solid fa-satellite-dish"></i> LIVE</span>
+              <video id="localVideo" autoplay playsinline muted></video>
+              <div id="localAvatarFallback" class="avatar-tile-fallback">
+                <span class="tile-avatar" id="localCallAvatar">⚡</span>
+                <span class="tile-username" id="localCallName">You</span>
+                <span class="tile-mute-badge hidden" id="localMuteBadge"><i class="fa-solid fa-microphone-slash"></i></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Integrated Stage Control Dock -->
+          <div class="stage-controls-dock">
+            <button class="dock-btn" id="toggleMicBtn" title="Mute/Unmute Mic">
+              <i class="fa-solid fa-microphone"></i>
+            </button>
+            <button class="dock-btn" id="toggleCamBtn" title="Turn Camera On/Off">
+              <i class="fa-solid fa-video"></i>
+            </button>
+            <button class="dock-btn" id="toggleScreenShareBtn" title="Share Screen">
+              <i class="fa-solid fa-desktop"></i>
+            </button>
+            <button class="dock-btn disconnect" id="endCallBtn" title="Disconnect">
+              <i class="fa-solid fa-phone-slash"></i>
+            </button>
+          </div>
+        </div>
+
         <!-- MESSAGES STREAM CONTAINER -->
         <div class="messages-container" id="messagesContainer">
           <div class="chat-welcome-banner">
@@ -216,41 +273,7 @@
       </div>
     </div>
 
-    <!-- ACTIVE CALL WINDOW OVERLAY -->
-    <div id="callOverlay" class="call-overlay hidden">
-      <div class="call-window">
-        <!-- Main Display (Remote Video or Screen Share) -->
-        <div class="video-container">
-          <video id="remoteVideo" autoplay playsinline></video>
-          <div id="remoteAvatarFallback" class="remote-avatar-fallback hidden">
-            <span id="remoteCallAvatar">⚡</span>
-            <h4 id="remoteCallName">Friend</h4>
-            <span class="call-status-badge" id="callStatusBadge">Voice Connected</span>
-          </div>
 
-          <!-- Picture-in-Picture Local Video -->
-          <div class="pip-container" id="pipContainer">
-            <video id="localVideo" autoplay playsinline muted></video>
-          </div>
-        </div>
-
-        <!-- Call Control Bar -->
-        <div class="call-controls-bar">
-          <button class="call-control-btn" id="toggleMicBtn" title="Mute/Unmute Mic">
-            <i class="fa-solid fa-microphone"></i>
-          </button>
-          <button class="call-control-btn" id="toggleCamBtn" title="Turn Camera On/Off">
-            <i class="fa-solid fa-video"></i>
-          </button>
-          <button class="call-control-btn" id="toggleScreenShareBtn" title="Share/Stop Screen">
-            <i class="fa-solid fa-desktop"></i>
-          </button>
-          <button class="call-control-btn hangup" id="endCallBtn" title="End Call">
-            <i class="fa-solid fa-phone-slash"></i>
-          </button>
-        </div>
-      </div>
-    </div>
 
     <!-- TOAST NOTIFICATION -->
     <div id="toast" class="toast hidden">

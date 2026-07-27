@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Whisper Messenger - Client Application Logic (with WebRTC Calls & Screen Sharing)
+   Whisper Messenger - Client Application Logic (with Discord-Style Call Stage)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeCallPeer = null; // target socket ID
   let incomingCallData = null;
   let isAudioMuted = false;
-  let isVideoMuted = false;
+  let isVideoMuted = true;
   let isScreenSharing = false;
   let ringtoneTimer = null;
 
@@ -70,15 +70,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const acceptCallBtn = document.getElementById('acceptCallBtn');
   const declineCallBtn = document.getElementById('declineCallBtn');
 
-  // DOM Elements - Active Call Overlay
-  const callOverlay = document.getElementById('callOverlay');
+  // DOM Elements - Discord Call Stage
+  const callStage = document.getElementById('callStage');
+  const callStageStatus = document.getElementById('callStageStatus');
   const remoteVideo = document.getElementById('remoteVideo');
   const localVideo = document.getElementById('localVideo');
   const remoteAvatarFallback = document.getElementById('remoteAvatarFallback');
+  const localAvatarFallback = document.getElementById('localAvatarFallback');
   const remoteCallAvatar = document.getElementById('remoteCallAvatar');
   const remoteCallName = document.getElementById('remoteCallName');
-  const callStatusBadge = document.getElementById('callStatusBadge');
-  const pipContainer = document.getElementById('pipContainer');
+  const localCallAvatar = document.getElementById('localCallAvatar');
+  const localCallName = document.getElementById('localCallName');
+  const remoteLiveBadge = document.getElementById('remoteLiveBadge');
+  const localLiveBadge = document.getElementById('localLiveBadge');
+  const remoteMuteBadge = document.getElementById('remoteMuteBadge');
+  const localMuteBadge = document.getElementById('localMuteBadge');
   const toggleMicBtn = document.getElementById('toggleMicBtn');
   const toggleCamBtn = document.getElementById('toggleCamBtn');
   const toggleScreenShareBtn = document.getElementById('toggleScreenShareBtn');
@@ -150,6 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
     displayRoomName.textContent = currentRoom;
     headerRoomTitle.textContent = `# ${currentRoom}`;
     welcomeRoomName.textContent = currentRoom;
+
+    localCallAvatar.textContent = currentUser.avatar;
+    localCallName.textContent = currentUser.username;
 
     joinModal.classList.add('hidden');
     chatView.classList.remove('hidden');
@@ -231,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     stopRingtone();
     if (peerConnection) {
       await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-      callStatusBadge.textContent = 'Connected';
+      callStageStatus.textContent = 'Voice Connected';
     }
   });
 
@@ -251,14 +260,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   socket.on('remote_media_toggled', ({ mediaType, enabled }) => {
-    if (mediaType === 'video') {
+    if (mediaType === 'video' || mediaType === 'screen') {
       if (enabled) {
         remoteVideo.classList.remove('hidden');
         remoteAvatarFallback.classList.add('hidden');
+        if (mediaType === 'screen') remoteLiveBadge.classList.remove('hidden');
       } else {
         remoteVideo.classList.add('hidden');
         remoteAvatarFallback.classList.remove('hidden');
+        remoteLiveBadge.classList.add('hidden');
       }
+    } else if (mediaType === 'audio') {
+      remoteMuteBadge.classList.toggle('hidden', enabled);
     }
   });
 
@@ -287,17 +300,42 @@ document.addEventListener('DOMContentLoaded', () => {
       audioTrack.enabled = !isAudioMuted;
       toggleMicBtn.classList.toggle('muted', isAudioMuted);
       toggleMicBtn.querySelector('i').className = isAudioMuted ? 'fa-solid fa-microphone-slash' : 'fa-solid fa-microphone';
+      localMuteBadge.classList.toggle('hidden', !isAudioMuted);
+
+      if (activeCallPeer) {
+        socket.emit('toggle_media', { targetSocketId: activeCallPeer, mediaType: 'audio', enabled: !isAudioMuted });
+      }
     }
   });
 
   toggleCamBtn.addEventListener('click', async () => {
-    if (!localStream) return;
+    if (!localStream) {
+      try {
+        const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const track = camStream.getVideoTracks()[0];
+        if (localStream) localStream.addTrack(track);
+        else localStream = camStream;
+      } catch (e) {
+        showToast('Camera access denied');
+        return;
+      }
+    }
+
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
       isVideoMuted = !isVideoMuted;
       videoTrack.enabled = !isVideoMuted;
-      toggleCamBtn.classList.toggle('muted', isVideoMuted);
-      toggleCamBtn.querySelector('i').className = isVideoMuted ? 'fa-solid fa-video-slash' : 'fa-solid fa-video';
+      toggleCamBtn.classList.toggle('active', !isVideoMuted);
+      toggleCamBtn.querySelector('i').className = isVideoMuted ? 'fa-solid fa-video' : 'fa-solid fa-video-slash';
+
+      if (!isVideoMuted) {
+        localVideo.srcObject = localStream;
+        localVideo.classList.remove('hidden');
+        localAvatarFallback.classList.add('hidden');
+      } else {
+        localVideo.classList.add('hidden');
+        localAvatarFallback.classList.remove('hidden');
+      }
 
       if (activeCallPeer) {
         socket.emit('toggle_media', { targetSocketId: activeCallPeer, mediaType: 'video', enabled: !isVideoMuted });
@@ -326,28 +364,36 @@ document.addEventListener('DOMContentLoaded', () => {
     activeCallPeer = friend.id;
     remoteCallAvatar.textContent = friend.avatar;
     remoteCallName.textContent = friend.username;
-    callStatusBadge.textContent = 'Calling...';
+    callStageStatus.textContent = 'Calling...';
 
     try {
       if (callType === 'screen') {
         localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         isScreenSharing = true;
+        isVideoMuted = false;
         toggleScreenShareBtn.classList.add('active');
-      } else {
-        const constraints = {
-          audio: true,
-          video: callType === 'video'
-        };
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        localLiveBadge.classList.remove('hidden');
+        localVideo.srcObject = localStream;
+        localVideo.classList.remove('hidden');
+        localAvatarFallback.classList.add('hidden');
+      } else if (callType === 'video') {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        isVideoMuted = false;
+        toggleCamBtn.classList.add('active');
+        localVideo.srcObject = localStream;
+        localVideo.classList.remove('hidden');
+        localAvatarFallback.classList.add('hidden');
+      } else { // Audio only
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        isVideoMuted = true;
+        localVideo.classList.add('hidden');
+        localAvatarFallback.classList.remove('hidden');
       }
 
-      setupLocalVideo();
       createPeerConnection();
 
-      // Add local tracks to peer connection
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-      // Create Offer
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
 
@@ -357,16 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
         callType
       });
 
-      // Show call interface
-      callOverlay.classList.remove('hidden');
-
-      if (callType === 'audio') {
-        remoteVideo.classList.add('hidden');
-        remoteAvatarFallback.classList.remove('hidden');
-      } else {
-        remoteVideo.classList.remove('hidden');
-        remoteAvatarFallback.classList.add('hidden');
-      }
+      // Show inline Discord Call Stage above chat
+      callStage.classList.remove('hidden');
 
     } catch (err) {
       console.error('Error starting call:', err);
@@ -381,19 +419,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!incomingCallData) return;
 
     activeCallPeer = incomingCallData.callerId;
-    const callType = incomingCallData.callType;
-
     remoteCallAvatar.textContent = incomingCallData.callerAvatar;
     remoteCallName.textContent = incomingCallData.callerName;
-    callStatusBadge.textContent = 'Connecting...';
+    callStageStatus.textContent = 'Connecting...';
 
     try {
-      const constraints = {
-        audio: true,
-        video: callType !== 'audio'
-      };
-      localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setupLocalVideo();
+      // CRITICAL FIX: Default to AUDIO ONLY when answering call (camera stays OFF!)
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      isVideoMuted = true;
+
+      localVideo.classList.add('hidden');
+      localAvatarFallback.classList.remove('hidden');
 
       createPeerConnection();
 
@@ -408,21 +444,22 @@ document.addEventListener('DOMContentLoaded', () => {
         answer
       });
 
-      callOverlay.classList.remove('hidden');
+      callStage.classList.remove('hidden');
 
-      if (callType === 'audio') {
-        remoteVideo.classList.add('hidden');
-        remoteAvatarFallback.classList.remove('hidden');
-      } else {
+      if (incomingCallData.callType === 'screen' || incomingCallData.callType === 'video') {
         remoteVideo.classList.remove('hidden');
         remoteAvatarFallback.classList.add('hidden');
+        if (incomingCallData.callType === 'screen') remoteLiveBadge.classList.remove('hidden');
+      } else {
+        remoteVideo.classList.add('hidden');
+        remoteAvatarFallback.classList.remove('hidden');
       }
 
       incomingCallData = null;
 
     } catch (err) {
       console.error('Error answering call:', err);
-      showToast('Could not access media devices');
+      showToast('Could not access microphone');
       cleanupCall();
     }
   }
@@ -442,7 +479,12 @@ document.addEventListener('DOMContentLoaded', () => {
     peerConnection.ontrack = (event) => {
       remoteStream = event.streams[0];
       remoteVideo.srcObject = remoteStream;
-      callStatusBadge.textContent = 'Connected';
+      callStageStatus.textContent = 'Voice Connected';
+
+      if (event.track.kind === 'video') {
+        remoteVideo.classList.remove('hidden');
+        remoteAvatarFallback.classList.add('hidden');
+      }
     };
 
     peerConnection.onconnectionstatechange = () => {
@@ -450,15 +492,6 @@ document.addEventListener('DOMContentLoaded', () => {
         cleanupCall();
       }
     };
-  }
-
-  function setupLocalVideo() {
-    localVideo.srcObject = localStream;
-    if (localStream.getVideoTracks().length === 0) {
-      pipContainer.classList.add('hidden');
-    } else {
-      pipContainer.classList.remove('hidden');
-    }
   }
 
   async function toggleScreenShare() {
@@ -477,8 +510,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         localVideo.srcObject = screenStream;
+        localVideo.classList.remove('hidden');
+        localAvatarFallback.classList.add('hidden');
+        localLiveBadge.classList.remove('hidden');
         isScreenSharing = true;
         toggleScreenShareBtn.classList.add('active');
+
+        socket.emit('toggle_media', { targetSocketId: activeCallPeer, mediaType: 'screen', enabled: true });
 
         screenTrack.onended = () => stopScreenShare();
       } catch (err) {
@@ -491,19 +529,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function stopScreenShare() {
     if (!isScreenSharing) return;
-    try {
-      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const camTrack = camStream.getVideoTracks()[0];
-      const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-      if (sender) {
-        sender.replaceTrack(camTrack);
-      }
-      localVideo.srcObject = camStream;
-    } catch (e) {
-      // If camera fails, remove video track
-    }
+    localLiveBadge.classList.add('hidden');
     isScreenSharing = false;
     toggleScreenShareBtn.classList.remove('active');
+    localVideo.classList.add('hidden');
+    localAvatarFallback.classList.remove('hidden');
+
+    if (activeCallPeer) {
+      socket.emit('toggle_media', { targetSocketId: activeCallPeer, mediaType: 'screen', enabled: false });
+    }
   }
 
   function cleanupCall() {
@@ -522,14 +556,16 @@ document.addEventListener('DOMContentLoaded', () => {
     activeCallPeer = null;
     incomingCallData = null;
     isAudioMuted = false;
-    isVideoMuted = false;
+    isVideoMuted = true;
     isScreenSharing = false;
 
     toggleMicBtn.classList.remove('muted');
-    toggleCamBtn.classList.remove('muted');
+    toggleCamBtn.classList.remove('active');
     toggleScreenShareBtn.classList.remove('active');
+    localLiveBadge.classList.add('hidden');
+    remoteLiveBadge.classList.add('hidden');
 
-    callOverlay.classList.add('hidden');
+    callStage.classList.add('hidden');
     incomingCallModal.classList.add('hidden');
   }
 

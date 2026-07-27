@@ -1014,120 +1014,166 @@ body, html {
   transform: translateY(-2px);
 }
 
-/* Active Call Overlay */
-.call-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(9, 13, 22, 0.95);
-  backdrop-filter: blur(16px);
-  z-index: 1500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.call-window {
-  width: 100%;
-  max-width: 960px;
-  height: 90vh;
-  max-height: 640px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
+/* ==========================================================================
+   DISCORD-STYLE INLINE CALL STAGE
+   ========================================================================== */
+.discord-call-stage {
+  background: #111214;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
-  position: relative;
-}
-
-.video-container {
-  flex: 1;
-  background: #000;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-#remoteVideo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.remote-avatar-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 12px 16px;
   gap: 12px;
+  max-height: 380px;
+  transition: all 0.3s ease;
 }
 
-.remote-avatar-fallback span {
-  font-size: 64px;
-  width: 120px;
-  height: 120px;
-  background: var(--bg-input);
+.stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stage-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-green);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-green);
   border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.stage-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+
+}
+
+.stage-icon-btn:hover {
+  color: var(--text-main);
+}
+
+/* Stage Grid */
+.stage-grid {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 200px;
+  max-height: 280px;
+  overflow: hidden;
+}
+
+.stream-tile {
+  flex: 1;
+  background: #1e1f22;
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3px solid var(--accent-primary);
-  box-shadow: 0 0 30px var(--accent-glow);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.call-status-badge {
-  font-size: 12px;
-  background: var(--accent-glow);
-  color: var(--accent-secondary);
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-weight: 600;
-}
-
-/* Picture in Picture Local Video */
-.pip-container {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  width: 180px;
-  height: 120px;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 2px solid var(--accent-primary);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
-  background: #111;
-  z-index: 10;
-}
-
-#localVideo {
+.stream-tile video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1); /* Mirror camera */
+  background: #000;
 }
 
-/* Call Control Bar */
-.call-controls-bar {
-  height: 72px;
-  background: var(--bg-sidebar);
-  border-top: 1px solid var(--border-color);
+.live-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #ed4245;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(237, 66, 69, 0.5);
+}
+
+.avatar-tile-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  background: #1e1f22;
+  position: relative;
+}
+
+.tile-avatar {
+  font-size: 42px;
+  width: 80px;
+  height: 80px;
+  background: var(--bg-input);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  border: 2px solid var(--border-glow);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
 }
 
-.call-control-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+.tile-username {
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-main);
-  font-size: 18px;
+}
+
+.tile-mute-badge {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(239, 68, 68, 0.85);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+/* Stage Controls Dock */
+.stage-controls-dock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.dock-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #2b2d31;
+  border: none;
+  color: var(--text-main);
+  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1135,31 +1181,30 @@ body, html {
   transition: var(--transition);
 }
 
-.call-control-btn:hover {
-  background: var(--bg-hover);
-  transform: scale(1.08);
+.dock-btn:hover {
+  background: #35373c;
+  transform: scale(1.05);
 }
 
-.call-control-btn.muted {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  border-color: #ef4444;
-}
-
-.call-control-btn.active {
-  background: var(--accent-glow);
-  color: var(--accent-secondary);
-  border-color: var(--accent-secondary);
-}
-
-.call-control-btn.hangup {
-  background: #ef4444;
+.dock-btn.muted {
+  background: #f23f43;
   color: white;
-  border: none;
 }
 
-.call-control-btn.hangup:hover {
-  background: #dc2626;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+.dock-btn.active {
+  background: var(--accent-primary);
+  color: white;
+  box-shadow: 0 0 12px var(--accent-glow);
 }
+
+.dock-btn.disconnect {
+  background: #f23f43;
+  color: white;
+}
+
+.dock-btn.disconnect:hover {
+  background: #da373c;
+  box-shadow: 0 0 15px rgba(242, 63, 67, 0.5);
+}
+
 
