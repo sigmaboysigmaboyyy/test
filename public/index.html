@@ -1,335 +1,221 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Whisper — Direct Messages & Servers</title>
-  <!-- Google Fonts & Font Awesome Icons -->
+  <title>Whisper — Instant Public Chat</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app" class="app-container">
+  <!-- Background Glow FX -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-glow bg-glow-3"></div>
 
-    <!-- AUTHENTICATION MODAL (LOGIN / REGISTER) -->
-    <div id="authModal" class="modal-overlay">
-      <div class="modal-card auth-card">
-        <div class="brand-header">
-          <div class="brand-logo">
-            <span>⚡ Whisper</span>
-          </div>
-          <p class="brand-tagline">Create an account to save your DMs and join servers.</p>
+  <!-- FIRST TIME NICKNAME MODAL -->
+  <div id="nicknameModal" class="modal-backdrop active">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="brand-badge">
+          <span class="brand-icon">💬</span>
+          <span class="brand-name">Whisper</span>
         </div>
-
-        <div class="auth-tabs">
-          <button type="button" class="auth-tab active" id="tabLogin">Log In</button>
-          <button type="button" class="auth-tab" id="tabRegister">Register</button>
-        </div>
-
-        <form id="authForm" class="join-form">
-          <div class="input-group">
-            <label for="authUsername"><i class="fa-solid fa-user"></i> Username</label>
-            <input type="text" id="authUsername" placeholder="e.g. Alex, Sam, Ghost" required minlength="2" maxlength="20" autocomplete="username">
-          </div>
-
-          <div class="input-group">
-            <label for="authPassword"><i class="fa-solid fa-lock"></i> Password</label>
-            <input type="password" id="authPassword" placeholder="••••••••" required minlength="4" autocomplete="current-password">
-          </div>
-
-          <div class="input-group hidden" id="avatarGroup">
-            <label><i class="fa-solid fa-icons"></i> Choose Avatar</label>
-            <div class="avatar-selector" id="avatarSelector">
-              <span class="avatar-option selected" data-avatar="⚡">⚡</span>
-              <span class="avatar-option" data-avatar="🦊">🦊</span>
-              <span class="avatar-option" data-avatar="🐱">🐱</span>
-              <span class="avatar-option" data-avatar="🚀">🚀</span>
-              <span class="avatar-option" data-avatar="👾">👾</span>
-              <span class="avatar-option" data-avatar="🔥">🔥</span>
-              <span class="avatar-option" data-avatar="💎">💎</span>
-              <span class="avatar-option" data-avatar="🎧">🎧</span>
-            </div>
-          </div>
-
-          <p class="error-msg hidden" id="authErrorMsg"></p>
-
-          <button type="submit" class="btn-primary start-chat-btn" id="authSubmitBtn">
-            Log In <i class="fa-solid fa-arrow-right"></i>
-          </button>
-        </form>
+        <h2>Добро пожаловать!</h2>
+        <p>Выберите ваш никнейм и аватар, чтобы войти в общий чат без регистрации.</p>
       </div>
-    </div>
 
-    <!-- MAIN PLATFORM LAYOUT (DISCORD-LIKE THREE COLUMNS) -->
-    <div id="mainLayout" class="main-layout hidden">
-      
-      <!-- 1. LEFTMOST SERVER RAIL -->
-      <nav class="server-rail">
-        <button class="rail-btn active" id="homeRailBtn" title="Direct Messages">
-          <i class="fa-solid fa-comments"></i>
-        </button>
-        
-        <div class="rail-divider"></div>
-
-        <div class="servers-scroll-list" id="serversRailList">
-          <!-- Dynamic Server Icons -->
-        </div>
-
-        <button class="rail-btn add-btn" id="openCreateServerBtn" title="Create a Server">
-          <i class="fa-solid fa-plus"></i>
-        </button>
-        <button class="rail-btn join-btn" id="openJoinServerBtn" title="Join Server with Code">
-          <i class="fa-solid fa-compass"></i>
-        </button>
-      </nav>
-
-      <!-- 2. SECONDARY SIDEBAR (DMs LIST OR SERVER CHANNELS) -->
-      <aside class="sidebar" id="sidebar">
-        <!-- Sidebar Header -->
-        <div class="sidebar-header">
-          <h2 id="sidebarTitle">Direct Messages</h2>
-          <button class="icon-btn" id="openNewDmBtn" title="New Direct Message">
-            <i class="fa-solid fa-user-plus"></i>
-          </button>
-        </div>
-
-        <!-- DM Friends List / Server Channels List -->
-        <div class="members-section">
-          <ul class="nav-items-list" id="sidebarItemsList">
-            <!-- Dynamic DMs or Server Channels -->
-          </ul>
-        </div>
-
-        <!-- Sidebar Footer Profile Badge -->
-        <div class="sidebar-footer">
-          <div class="user-profile-badge">
-            <span class="user-avatar" id="myAvatarDisplay">⚡</span>
-            <div class="user-info">
-              <span class="user-name" id="myNameDisplay">User</span>
-              <span class="status-indicator online">Online</span>
-            </div>
-          </div>
-          <button class="icon-btn leave-btn" id="logoutBtn" title="Log Out">
-            <i class="fa-solid fa-right-from-bracket"></i>
-          </button>
-        </div>
-      </aside>
-
-      <!-- 3. PRIMARY CHAT & CALL STAGE AREA -->
-      <main class="chat-main">
-        <!-- CHAT HEADER -->
-        <header class="chat-header">
-          <div class="header-left">
-            <div class="chat-title-info">
-              <h3 id="headerTitle"># select-a-chat</h3>
-              <p class="subtext" id="headerSubtext">Direct message history saved</p>
-            </div>
-          </div>
-
-          <div class="header-actions">
-            <button class="icon-btn call-btn" id="startAudioCallBtn" title="Start Voice Call">
-              <i class="fa-solid fa-phone"></i>
-            </button>
-            <button class="icon-btn call-btn" id="startVideoCallBtn" title="Start Video Call">
-              <i class="fa-solid fa-video"></i>
-            </button>
-            <button class="icon-btn call-btn" id="startScreenShareBtn" title="Share Screen">
-              <i class="fa-solid fa-desktop"></i>
-            </button>
-            <button class="icon-btn" id="soundToggleBtn" title="Toggle Notifications Sound">
-              <i class="fa-solid fa-volume-high" id="soundIcon"></i>
-            </button>
-          </div>
-        </header>
-
-        <!-- DISCORD-STYLE INLINE CALL STAGE -->
-        <div id="callStage" class="discord-call-stage hidden">
-          <div class="stage-header">
-            <div class="stage-info">
-              <span class="status-dot"></span>
-              <span id="callStageStatus">Voice Connected</span>
-            </div>
-          </div>
-
-          <div class="stage-grid" id="stageGrid">
-            <!-- Remote Participant Stream / Avatar Tile -->
-            <div class="stream-tile" id="remoteStreamTile">
-              <span class="live-badge hidden" id="remoteLiveBadge"><i class="fa-solid fa-satellite-dish"></i> LIVE</span>
-              <video id="remoteVideo" autoplay playsinline></video>
-              <div id="remoteAvatarFallback" class="avatar-tile-fallback">
-                <span class="tile-avatar" id="remoteCallAvatar">⚡</span>
-                <span class="tile-username" id="remoteCallName">Friend</span>
-                <span class="tile-mute-badge" id="remoteMuteBadge"><i class="fa-solid fa-microphone-slash"></i></span>
-              </div>
-            </div>
-
-            <!-- Local Participant Stream / Avatar Tile -->
-            <div class="stream-tile" id="localStreamTile">
-              <span class="live-badge hidden" id="localLiveBadge"><i class="fa-solid fa-satellite-dish"></i> LIVE</span>
-              <video id="localVideo" autoplay playsinline muted></video>
-              <div id="localAvatarFallback" class="avatar-tile-fallback">
-                <span class="tile-avatar" id="localCallAvatar">⚡</span>
-                <span class="tile-username" id="localCallName">You</span>
-                <span class="tile-mute-badge hidden" id="localMuteBadge"><i class="fa-solid fa-microphone-slash"></i></span>
-              </div>
-            </div>
-          </div>
-
-          <div class="stage-controls-dock">
-            <button class="dock-btn" id="toggleMicBtn" title="Mute/Unmute Mic">
-              <i class="fa-solid fa-microphone"></i>
-            </button>
-            <button class="dock-btn" id="toggleCamBtn" title="Turn Camera On/Off">
-              <i class="fa-solid fa-video"></i>
-            </button>
-            <button class="dock-btn" id="toggleScreenShareBtn" title="Share Screen">
-              <i class="fa-solid fa-desktop"></i>
-            </button>
-            <button class="dock-btn disconnect" id="endCallBtn" title="Disconnect">
-              <i class="fa-solid fa-phone-slash"></i>
-            </button>
+      <form id="nicknameForm">
+        <div class="form-group">
+          <label for="modalNickname">Ваш Никнейм</label>
+          <div class="input-with-action">
+            <input type="text" id="modalNickname" placeholder="Например: CyberNinja" maxlength="25" required autocomplete="off">
+            <button type="button" id="btnRandomNick" class="btn-secondary-action" title="Сгенерировать случайный ник">🎲 Рандом</button>
           </div>
         </div>
 
-        <!-- MESSAGES STREAM CONTAINER -->
-        <div class="messages-container" id="messagesContainer">
-          <div class="chat-welcome-banner" id="welcomeBanner">
-            <div class="welcome-icon">💬</div>
-            <h3 id="welcomeTitle">Welcome to Whisper!</h3>
-            <p id="welcomeDesc">Select a Direct Message contact or join a server to start chatting.</p>
+        <div class="form-group">
+          <label>Выберите Аватар-Иконку</label>
+          <div class="avatar-grid" id="avatarGrid">
+            <button type="button" class="avatar-opt active" data-avatar="🚀">🚀</button>
+            <button type="button" class="avatar-opt" data-avatar="🦊">🦊</button>
+            <button type="button" class="avatar-opt" data-avatar="⚡">⚡</button>
+            <button type="button" class="avatar-opt" data-avatar="💎">💎</button>
+            <button type="button" class="avatar-opt" data-avatar="🐉">🐉</button>
+            <button type="button" class="avatar-opt" data-avatar="🌙">🌙</button>
+            <button type="button" class="avatar-opt" data-avatar="🐱">🐱</button>
+            <button type="button" class="avatar-opt" data-avatar="👾">👾</button>
+            <button type="button" class="avatar-opt" data-avatar="🎨">🎨</button>
+            <button type="button" class="avatar-opt" data-avatar="🔥">🔥</button>
+            <button type="button" class="avatar-opt" data-avatar="👑">👑</button>
+            <button type="button" class="avatar-opt" data-avatar="🍀">🍀</button>
           </div>
         </div>
 
-        <!-- TYPING INDICATOR BAR -->
-        <div class="typing-bar hidden" id="typingIndicator">
-          <div class="dots-bubble">
-            <span></span><span></span><span></span>
+        <div class="form-group">
+          <label>Цвет Аватара</label>
+          <div class="color-picker-list" id="colorPickerList">
+            <button type="button" class="color-opt active" data-color="#6366f1" style="background: #6366f1;"></button>
+            <button type="button" class="color-opt" data-color="#ec4899" style="background: #ec4899;"></button>
+            <button type="button" class="color-opt" data-color="#10b981" style="background: #10b981;"></button>
+            <button type="button" class="color-opt" data-color="#f59e0b" style="background: #f59e0b;"></button>
+            <button type="button" class="color-opt" data-color="#8b5cf6" style="background: #8b5cf6;"></button>
+            <button type="button" class="color-opt" data-color="#06b6d4" style="background: #06b6d4;"></button>
+            <button type="button" class="color-opt" data-color="#ef4444" style="background: #ef4444;"></button>
           </div>
-          <span id="typingText">Friend is typing...</span>
         </div>
 
-        <!-- ATTACHMENT PREVIEW CARD -->
-        <div class="attachment-preview-bar hidden" id="attachmentPreviewBar">
-          <div class="preview-content">
-            <img id="imagePreview" src="" alt="Attachment Preview" class="hidden">
-            <div id="filePreview" class="file-preview-box hidden">
-              <i class="fa-solid fa-file"></i>
-              <span id="fileName">file.pdf</span>
-            </div>
-          </div>
-          <button type="button" class="remove-attachment-btn" id="removeAttachmentBtn">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-
-        <!-- INPUT BAR -->
-        <div class="input-area">
-          <form id="messageForm" class="message-form">
-            <input type="file" id="fileInput" accept="image/*,.pdf,.doc,.docx,.txt" class="hidden">
-            
-            <button type="button" class="icon-btn attach-btn" id="attachBtn" title="Attach file">
-              <i class="fa-solid fa-paperclip"></i>
-            </button>
-
-            <div class="input-wrapper">
-              <textarea id="messageInput" placeholder="Type a message..." rows="1" maxlength="1000"></textarea>
-            </div>
-
-            <button type="submit" class="send-btn" id="sendBtn">
-              <i class="fa-solid fa-paper-plane"></i>
-            </button>
-          </form>
-        </div>
-      </main>
-    </div>
-
-    <!-- NEW DM MODAL -->
-    <div id="newDmModal" class="modal-overlay hidden">
-      <div class="modal-card">
-        <h3>New Direct Message</h3>
-        <div class="input-group">
-          <input type="text" id="searchUserInput" placeholder="Search registered user by username...">
-        </div>
-        <ul class="user-search-results" id="userSearchResults"></ul>
-        <button type="button" class="btn-secondary" id="closeNewDmBtn">Cancel</button>
-      </div>
-    </div>
-
-    <!-- CREATE SERVER MODAL -->
-    <div id="createServerModal" class="modal-overlay hidden">
-      <div class="modal-card">
-        <h3>Create Your Server</h3>
-        <form id="createServerForm">
-          <div class="input-group">
-            <label>Server Name</label>
-            <input type="text" id="serverNameInput" placeholder="e.g. Squad Lounge" required maxlength="30">
-          </div>
-          <div class="input-group">
-            <label>Choose Server Icon Emoji</label>
-            <div class="avatar-selector" id="serverIconSelector">
-              <span class="avatar-option selected" data-icon="🛡️">🛡️</span>
-              <span class="avatar-option" data-icon="🚀">🚀</span>
-              <span class="avatar-option" data-icon="🎮">🎮</span>
-              <span class="avatar-option" data-icon="🎧">🎧</span>
-              <span class="avatar-option" data-icon="🔥">🔥</span>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="btn-secondary" id="closeCreateServerBtn">Cancel</button>
-            <button type="submit" class="btn-primary">Create Server</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- JOIN SERVER MODAL -->
-    <div id="joinServerModal" class="modal-overlay hidden">
-      <div class="modal-card">
-        <h3>Join Server with Invite Code</h3>
-        <form id="joinServerForm">
-          <div class="input-group">
-            <label>Server Invite Code</label>
-            <input type="text" id="joinInviteInput" placeholder="e.g. 7f3a9b1c" required>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="btn-secondary" id="closeJoinServerBtn">Cancel</button>
-            <button type="submit" class="btn-primary">Join Server</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- INCOMING CALL MODAL -->
-    <div id="incomingCallModal" class="modal-overlay hidden">
-      <div class="modal-card call-modal-card">
-        <div class="call-avatar-pulse">
-          <span id="callerAvatarDisplay">⚡</span>
-        </div>
-        <h3 id="callerNameDisplay">Friend</h3>
-        <p id="callTypeLabel">Incoming Video Call...</p>
-        <div class="call-action-btns">
-          <button type="button" id="declineCallBtn" class="call-action-btn decline">
-            <i class="fa-solid fa-phone-slash"></i> Decline
-          </button>
-          <button type="button" id="acceptCallBtn" class="call-action-btn accept">
-            <i class="fa-solid fa-phone"></i> Accept
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- TOAST NOTIFICATION -->
-    <div id="toast" class="toast hidden">
-      <i class="fa-solid fa-circle-check"></i>
-      <span id="toastMsg">Notification</span>
+        <button type="submit" class="btn-primary btn-block">Войти в Чат 🚀</button>
+      </form>
     </div>
   </div>
 
-  <!-- Socket.io Client -->
+  <!-- MAIN APP CONTAINER -->
+  <div id="appContainer" class="app-wrapper">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand">
+          <div class="logo-glow">💬</div>
+          <span class="logo-text">Whisper</span>
+          <span class="live-pill"><span class="pulse-dot"></span> LIVE</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="room-title">
+          🌐 Общий Канал
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button type="button" id="btnToggleSound" class="icon-btn" title="Звуковые уведомления">
+          <span id="soundIcon">🔔</span>
+        </button>
+
+        <button type="button" id="btnToggleUsers" class="icon-btn mobile-only" title="Список онлайн">
+          👥 <span id="onlineBadgeMobile" class="badge">0</span>
+        </button>
+
+        <div class="user-profile-badge" id="btnEditProfile" title="Нажмите чтобы сменить ник">
+          <div class="avatar-circle" id="userBadgeAvatar" style="background-color: #6366f1;">🚀</div>
+          <span class="user-name" id="userBadgeName">Loading...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Layout Content -->
+    <div class="app-body">
+      <!-- Chat Area -->
+      <main class="chat-section">
+        <!-- Messages Feed -->
+        <div class="messages-container" id="messagesContainer">
+          <div class="messages-list" id="messagesList">
+            <!-- Messages rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Typing Indicator Banner -->
+        <div id="typingBanner" class="typing-banner hidden">
+          <span class="typing-dots">
+            <span>.</span><span>.</span><span>.</span>
+          </span>
+          <span id="typingText">Кто-то печатает...</span>
+        </div>
+
+        <!-- Image Attachment Preview Bar -->
+        <div id="attachmentPreview" class="attachment-preview hidden">
+          <div class="preview-card">
+            <img id="previewImg" src="" alt="Attachment preview">
+            <button type="button" id="btnRemoveAttachment" class="btn-remove">&times;</button>
+          </div>
+        </div>
+
+        <!-- Emoji Bar Dropdown -->
+        <div id="emojiPicker" class="emoji-picker-popover hidden">
+          <div class="emoji-list">
+            <span>😀</span><span>😂</span><span>😍</span><span>🔥</span><span>👍</span>
+            <span>❤️</span><span>🎉</span><span>🚀</span><span>😎</span><span>🙌</span>
+            <span>💀</span><span>🥳</span><span>✨</span><span>🤔</span><span>💯</span>
+            <span>💩</span><span>👀</span><span>🤝</span><span>⚡</span><span>💩</span>
+          </div>
+        </div>
+
+        <!-- Message Input Area -->
+        <form id="chatForm" class="chat-input-bar">
+          <input type="file" id="imageInput" accept="image/*" style="display: none;">
+
+          <button type="button" id="btnAttachImage" class="action-btn" title="Прикрепить изображение">
+            🖼️
+          </button>
+
+          <button type="button" id="btnToggleEmoji" class="action-btn" title="Вставить эмодзи">
+            😀
+          </button>
+
+          <div class="input-wrapper">
+            <textarea id="messageInput" placeholder="Напишите сообщение..." rows="1" maxlength="2000"></textarea>
+          </div>
+
+          <button type="submit" id="btnSend" class="send-btn" title="Отправить сообщение">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </form>
+      </main>
+
+      <!-- Sidebar Users List -->
+      <aside class="sidebar-users" id="usersSidebar">
+        <div class="sidebar-header">
+          <h3>Участники в сети (<span id="onlineUsersCount">0</span>)</h3>
+        </div>
+        <div class="users-list" id="usersList">
+          <!-- Users rendered dynamically -->
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- EDIT PROFILE MODAL -->
+  <div id="profileModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Редактирование профиля</h2>
+        <p>Вы можете сменить никнейм и стиль аватара в любое время.</p>
+      </div>
+
+      <form id="editProfileForm">
+        <div class="form-group">
+          <label for="editNickname">Новый Никнейм</label>
+          <input type="text" id="editNickname" placeholder="Введите никнейм" maxlength="25" required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label>Иконка Аватара</label>
+          <div class="avatar-grid" id="editAvatarGrid">
+            <!-- Rendered in JS -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Цвет Аватара</label>
+          <div class="color-picker-list" id="editColorPickerList">
+            <!-- Rendered in JS -->
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="btnCancelEdit" class="btn-secondary">Отмена</button>
+          <button type="submit" class="btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

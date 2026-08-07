@@ -1,15 +1,14 @@
 {
-  "name": "friend-messenger",
+  "name": "whisper-messenger",
   "version": "1.0.0",
-  "description": "Whisper Messenger Platform",
+  "description": "Simple real-time public chat — pick a nickname once, then chat with everyone",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
   }

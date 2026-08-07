@@ -1,785 +1,447 @@
-/* ==========================================================================
-   Whisper Platform - Client Logic (Auth, DMs, Servers, Channels & WebRTC)
-   ========================================================================== */
+(function() {
+  'use strict';
 
-document.addEventListener('DOMContentLoaded', () => {
+  // --- Web Audio API sound effects ---
+  let soundEnabled = true;
+  let audioCtx = null;
+
+  function getAudioContext() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  function playSendSound() {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {
+      // Audio context blocked until interaction
+    }
+  }
+
+  function playReceiveSound() {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
+      osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15); // E5
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.18);
+    } catch (e) {}
+  }
+
+  // --- Random Nickname Generator ---
+  const NICK_PREFIXES = ['Cyber', 'Neon', 'Solar', 'Shadow', 'Viper', 'Pixel', 'Alpha', 'Cosmic', 'Hyper', 'Zen', 'Astra', 'Quantum'];
+  const NICK_NOUNS = ['Falcon', 'Wolf', 'Panda', 'Echo', 'Rider', 'Phoenix', 'Byte', 'Fox', 'Spark', 'Nexus', 'Blade', 'Vortex'];
+
+  function generateRandomNick() {
+    const p = NICK_PREFIXES[Math.floor(Math.random() * NICK_PREFIXES.length)];
+    const n = NICK_NOUNS[Math.floor(Math.random() * NICK_NOUNS.length)];
+    const num = Math.floor(Math.random() * 90 + 10);
+    return `${p}${n}_${num}`;
+  }
+
+  // --- DOM Elements ---
+  const nicknameModal = document.getElementById('nicknameModal');
+  const nicknameForm = document.getElementById('nicknameForm');
+  const modalNickname = document.getElementById('modalNickname');
+  const btnRandomNick = document.getElementById('btnRandomNick');
+  const avatarGrid = document.getElementById('avatarGrid');
+  const colorPickerList = document.getElementById('colorPickerList');
+
+  const appContainer = document.getElementById('appContainer');
+  const btnEditProfile = document.getElementById('btnEditProfile');
+  const userBadgeAvatar = document.getElementById('userBadgeAvatar');
+  const userBadgeName = document.getElementById('userBadgeName');
+  const btnToggleSound = document.getElementById('btnToggleSound');
+  const soundIcon = document.getElementById('soundIcon');
+  const btnToggleUsers = document.getElementById('btnToggleUsers');
+  const onlineBadgeMobile = document.getElementById('onlineBadgeMobile');
+
+  const messagesContainer = document.getElementById('messagesContainer');
+  const messagesList = document.getElementById('messagesList');
+  const typingBanner = document.getElementById('typingBanner');
+  const typingText = document.getElementById('typingText');
+
+  const chatForm = document.getElementById('chatForm');
+  const messageInput = document.getElementById('messageInput');
+  const btnAttachImage = document.getElementById('btnAttachImage');
+  const imageInput = document.getElementById('imageInput');
+  const attachmentPreview = document.getElementById('attachmentPreview');
+  const previewImg = document.getElementById('previewImg');
+  const btnRemoveAttachment = document.getElementById('btnRemoveAttachment');
+
+  const btnToggleEmoji = document.getElementById('btnToggleEmoji');
+  const emojiPicker = document.getElementById('emojiPicker');
+
+  const usersSidebar = document.getElementById('usersSidebar');
+  const usersList = document.getElementById('usersList');
+  const onlineUsersCount = document.getElementById('onlineUsersCount');
+
+  const profileModal = document.getElementById('profileModal');
+  const editProfileForm = document.getElementById('editProfileForm');
+  const editNickname = document.getElementById('editNickname');
+  const editAvatarGrid = document.getElementById('editAvatarGrid');
+  const editColorPickerList = document.getElementById('editColorPickerList');
+  const btnCancelEdit = document.getElementById('btnCancelEdit');
+
+  // State
+  let currentUser = {
+    username: '',
+    avatar: '🚀',
+    color: '#6366f1'
+  };
+  let attachedImageData = null;
+  let typingTimeout = null;
+  let isTypingSent = false;
   let socket = null;
 
-  // Application State
-  let currentUser = null;
-  let activeView = 'dms'; // 'dms' | 'server'
-  let activeServerId = null;
-  let activeChannelId = null;
-  let activeDm = null; // { id, partner_id, partner_name, partner_avatar }
-  let userServers = [];
-  let userDms = [];
+  // --- Avatar & Color Selectors Handler ---
+  function setupSelectorGrid(container, targetProp, callback) {
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      container.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      callback(btn.dataset[targetProp]);
+    });
+  }
 
-  // WebRTC State
-  let peerConnection = null;
-  let localStream = null;
-  let remoteStream = null;
-  let activeCallPeer = null;
-  let incomingCallData = null;
-  let isAudioMuted = false;
-  let isVideoMuted = true;
-  let isScreenSharing = false;
-  let ringtoneTimer = null;
+  setupSelectorGrid(avatarGrid, 'avatar', (val) => currentUser.avatar = val);
+  setupSelectorGrid(colorPickerList, 'color', (val) => currentUser.color = val);
 
-  const rtcConfig = {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-  };
+  // Randomize button click
+  btnRandomNick.addEventListener('click', () => {
+    modalNickname.value = generateRandomNick();
+  });
 
-  // DOM Elements - Auth & Modals
-  const authModal = document.getElementById('authModal');
-  const mainLayout = document.getElementById('mainLayout');
-  const authForm = document.getElementById('authForm');
-  const tabLogin = document.getElementById('tabLogin');
-  const tabRegister = document.getElementById('tabRegister');
-  const authUsername = document.getElementById('authUsername');
-  const authPassword = document.getElementById('authPassword');
-  const avatarGroup = document.getElementById('avatarGroup');
-  const avatarOptions = document.querySelectorAll('#avatarSelector .avatar-option');
-  const authErrorMsg = document.getElementById('authErrorMsg');
-  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  // --- Initialize App & Socket ---
+  function init() {
+    const saved = localStorage.getItem('whisper_user');
+    if (saved) {
+      try {
+        currentUser = JSON.parse(saved);
+      } catch (e) {}
+    }
 
-  // DOM Elements - Server Rail & Sidebar
-  const homeRailBtn = document.getElementById('homeRailBtn');
-  const serversRailList = document.getElementById('serversRailList');
-  const openCreateServerBtn = document.getElementById('openCreateServerBtn');
-  const openJoinServerBtn = document.getElementById('openJoinServerBtn');
-  const sidebarTitle = document.getElementById('sidebarTitle');
-  const openNewDmBtn = document.getElementById('openNewDmBtn');
-  const sidebarItemsList = document.getElementById('sidebarItemsList');
-  const myAvatarDisplay = document.getElementById('myAvatarDisplay');
-  const myNameDisplay = document.getElementById('myNameDisplay');
-  const logoutBtn = document.getElementById('logoutBtn');
-
-  // DOM Elements - Chat Header & Streams
-  const headerTitle = document.getElementById('headerTitle');
-  const headerSubtext = document.getElementById('headerSubtext');
-  const messagesContainer = document.getElementById('messagesContainer');
-  const welcomeBanner = document.getElementById('welcomeBanner');
-  const welcomeTitle = document.getElementById('welcomeTitle');
-  const welcomeDesc = document.getElementById('welcomeDesc');
-  const messageForm = document.getElementById('messageForm');
-  const messageInput = document.getElementById('messageInput');
-  const attachBtn = document.getElementById('attachBtn');
-  const fileInput = document.getElementById('fileInput');
-
-  // DOM Elements - Call Controls
-  const startAudioCallBtn = document.getElementById('startAudioCallBtn');
-  const startVideoCallBtn = document.getElementById('startVideoCallBtn');
-  const startScreenShareBtn = document.getElementById('startScreenShareBtn');
-  const incomingCallModal = document.getElementById('incomingCallModal');
-  const callerAvatarDisplay = document.getElementById('callerAvatarDisplay');
-  const callerNameDisplay = document.getElementById('callerNameDisplay');
-  const callTypeLabel = document.getElementById('callTypeLabel');
-  const acceptCallBtn = document.getElementById('acceptCallBtn');
-  const declineCallBtn = document.getElementById('declineCallBtn');
-  const callStage = document.getElementById('callStage');
-  const remoteVideo = document.getElementById('remoteVideo');
-  const localVideo = document.getElementById('localVideo');
-  const remoteAvatarFallback = document.getElementById('remoteAvatarFallback');
-  const localAvatarFallback = document.getElementById('localAvatarFallback');
-  const remoteCallAvatar = document.getElementById('remoteCallAvatar');
-  const remoteCallName = document.getElementById('remoteCallName');
-  const localCallAvatar = document.getElementById('localCallAvatar');
-  const localCallName = document.getElementById('localCallName');
-  const remoteLiveBadge = document.getElementById('remoteLiveBadge');
-  const localLiveBadge = document.getElementById('localLiveBadge');
-  const toggleMicBtn = document.getElementById('toggleMicBtn');
-  const toggleCamBtn = document.getElementById('toggleCamBtn');
-  const toggleScreenShareBtn = document.getElementById('toggleScreenShareBtn');
-  const endCallBtn = document.getElementById('endCallBtn');
-
-  // DOM Elements - New DM & Server Modals
-  const newDmModal = document.getElementById('newDmModal');
-  const searchUserInput = document.getElementById('searchUserInput');
-  const userSearchResults = document.getElementById('userSearchResults');
-  const closeNewDmBtn = document.getElementById('closeNewDmBtn');
-
-  const createServerModal = document.getElementById('createServerModal');
-  const createServerForm = document.getElementById('createServerForm');
-  const serverNameInput = document.getElementById('serverNameInput');
-  const serverIconOptions = document.querySelectorAll('#serverIconSelector .avatar-option');
-  const closeCreateServerBtn = document.getElementById('closeCreateServerBtn');
-
-  const joinServerModal = document.getElementById('joinServerModal');
-  const joinServerForm = document.getElementById('joinServerForm');
-  const joinInviteInput = document.getElementById('joinInviteInput');
-  const closeJoinServerBtn = document.getElementById('closeJoinServerBtn');
-
-  const toast = document.getElementById('toast');
-  const toastMsg = document.getElementById('toastMsg');
-
-  let selectedAvatar = '⚡';
-  let selectedServerIcon = '🛡️';
-  let isRegisterMode = false;
-  let currentAttachment = null;
-
-  // --------------------------------------------------------------------------
-  // AUTHENTICATION CHECK ON STARTUP
-  // --------------------------------------------------------------------------
-  checkAuthSession();
-
-  async function checkAuthSession() {
-    try {
-      const res = await fetch('/api/me');
-      if (res.ok) {
-        currentUser = await res.json();
-        onAuthSuccess();
-      } else {
-        showAuthModal();
-      }
-    } catch (e) {
-      showAuthModal();
+    if (currentUser.username) {
+      nicknameModal.classList.remove('active');
+      connectSocket();
+    } else {
+      modalNickname.value = generateRandomNick();
+      nicknameModal.classList.add('active');
     }
   }
 
-  function showAuthModal() {
-    authModal.classList.remove('hidden');
-    mainLayout.classList.add('hidden');
-  }
-
-  function onAuthSuccess() {
-    authModal.classList.add('hidden');
-    mainLayout.classList.remove('hidden');
-
-    myAvatarDisplay.textContent = currentUser.avatar;
-    myNameDisplay.textContent = currentUser.username;
-    localCallAvatar.textContent = currentUser.avatar;
-    localCallName.textContent = currentUser.username;
-
-    // Connect Socket.io
-    socket = io({ reConnection: true });
-    setupSocketListeners();
-
-    // Load Initial Data
-    loadServers();
-    loadDms();
-  }
-
-  // Auth Form Tabs Switcher
-  tabLogin.addEventListener('click', () => {
-    isRegisterMode = false;
-    tabLogin.classList.add('active');
-    tabRegister.classList.remove('active');
-    avatarGroup.classList.add('hidden');
-    authSubmitBtn.innerHTML = 'Log In <i class="fa-solid fa-arrow-right"></i>';
-    authErrorMsg.classList.add('hidden');
-  });
-
-  tabRegister.addEventListener('click', () => {
-    isRegisterMode = true;
-    tabRegister.classList.add('active');
-    tabLogin.classList.remove('active');
-    avatarGroup.classList.remove('hidden');
-    authSubmitBtn.innerHTML = 'Create Account <i class="fa-solid fa-arrow-right"></i>';
-    authErrorMsg.classList.add('hidden');
-  });
-
-  avatarOptions.forEach(opt => {
-    opt.addEventListener('click', () => {
-      avatarOptions.forEach(o => o.classList.remove('selected'));
-      opt.classList.add('selected');
-      selectedAvatar = opt.dataset.avatar;
-    });
-  });
-
-  authForm.addEventListener('submit', async (e) => {
+  // First time submit
+  nicknameForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    authErrorMsg.classList.add('hidden');
-
-    const username = authUsername.value.trim();
-    const password = authPassword.value;
-    const endpoint = isRegisterMode ? '/api/register' : '/api/login';
-
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, avatar: selectedAvatar })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        authErrorMsg.textContent = data.error || 'Authentication failed';
-        authErrorMsg.classList.remove('hidden');
-        return;
-      }
-
-      currentUser = data;
-      onAuthSuccess();
-    } catch (err) {
-      authErrorMsg.textContent = 'Server connection error';
-      authErrorMsg.classList.remove('hidden');
-    }
-  });
-
-  logoutBtn.addEventListener('click', async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    window.location.reload();
-  });
-
-  // --------------------------------------------------------------------------
-  // SERVERS & CHANNELS NAVIGATION
-  // --------------------------------------------------------------------------
-  async function loadServers() {
-    try {
-      const res = await fetch('/api/servers');
-      if (res.ok) {
-        userServers = await res.json();
-        renderServersRail();
-      }
-    } catch (e) {}
-  }
-
-  function renderServersRail() {
-    serversRailList.innerHTML = '';
-    userServers.forEach(srv => {
-      const btn = document.createElement('button');
-      btn.className = `rail-btn ${activeView === 'server' && activeServerId === srv.id ? 'active' : ''}`;
-      btn.title = srv.name;
-      btn.textContent = srv.icon || '🛡️';
-      btn.onclick = () => selectServer(srv);
-      serversRailList.appendChild(btn);
-    });
-  }
-
-  homeRailBtn.addEventListener('click', selectHomeView);
-
-  function selectHomeView() {
-    activeView = 'dms';
-    activeServerId = null;
-    activeChannelId = null;
-    homeRailBtn.classList.add('active');
-    renderServersRail();
-
-    sidebarTitle.textContent = 'Direct Messages';
-    openNewDmBtn.classList.remove('hidden');
-    renderDmsList();
-
-    if (activeDm) selectDm(activeDm);
-    else showWelcome('💬', 'Welcome to Whisper DMs', 'Select or search a contact to start chatting privately.');
-  }
-
-  async function selectServer(serverObj) {
-    activeView = 'server';
-    activeServerId = serverObj.id;
-    activeDm = null;
-    homeRailBtn.classList.remove('active');
-    renderServersRail();
-
-    sidebarTitle.textContent = serverObj.name;
-    openNewDmBtn.classList.add('hidden');
-
-    // Fetch Server Channels
-    const res = await fetch(`/api/servers/${serverObj.id}/channels`);
-    if (res.ok) {
-      const channels = await res.json();
-      renderChannelsList(channels);
-      if (channels.length > 0) selectChannel(channels[0]);
-    }
-  }
-
-  function renderChannelsList(channels) {
-    sidebarItemsList.innerHTML = '';
-    channels.forEach(ch => {
-      const li = document.createElement('li');
-      li.className = `nav-item ${activeChannelId === ch.id ? 'active' : ''}`;
-      li.innerHTML = `<span class="nav-item-icon">#</span> <span>${escapeHtml(ch.name)}</span>`;
-      li.onclick = () => selectChannel(ch);
-      sidebarItemsList.appendChild(li);
-    });
-  }
-
-  async function selectChannel(channel) {
-    activeChannelId = channel.id;
-    headerTitle.textContent = `# ${channel.name}`;
-    headerSubtext.textContent = `Server Channel`;
-
-    if (socket) socket.emit('join_channel', channel.id);
-
-    const res = await fetch(`/api/channels/${channel.id}/messages`);
-    if (res.ok) {
-      const messages = await res.json();
-      renderMessages(messages);
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // DIRECT MESSAGES (DMs)
-  // --------------------------------------------------------------------------
-  async function loadDms() {
-    try {
-      const res = await fetch('/api/dms');
-      if (res.ok) {
-        userDms = await res.json();
-        if (activeView === 'dms') renderDmsList();
-      }
-    } catch (e) {}
-  }
-
-  function renderDmsList() {
-    sidebarItemsList.innerHTML = '';
-    userDms.forEach(dm => {
-      const li = document.createElement('li');
-      li.className = `nav-item ${activeDm && activeDm.id === dm.id ? 'active' : ''}`;
-      li.innerHTML = `
-        <span class="nav-item-icon">${escapeHtml(dm.partner_avatar)}</span>
-        <span>${escapeHtml(dm.partner_name)}</span>
-      `;
-      li.onclick = () => selectDm(dm);
-      sidebarItemsList.appendChild(li);
-    });
-  }
-
-  async function selectDm(dm) {
-    activeDm = dm;
-    activeChannelId = null;
-    headerTitle.textContent = `@ ${dm.partner_name}`;
-    headerSubtext.textContent = `Private Direct Message`;
-
-    renderDmsList();
-
-    const res = await fetch(`/api/dms/${dm.id}/messages`);
-    if (res.ok) {
-      const messages = await res.json();
-      renderMessages(messages);
-    }
-  }
-
-  // Search User & Create DM
-  openNewDmBtn.addEventListener('click', () => {
-    newDmModal.classList.remove('hidden');
-    searchUserInput.focus();
-  });
-  closeNewDmBtn.addEventListener('click', () => newDmModal.classList.add('hidden'));
-
-  searchUserInput.addEventListener('input', async () => {
-    const q = searchUserInput.value.trim();
-    if (!q) {
-      userSearchResults.innerHTML = '';
-      return;
-    }
-
-    const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-    if (res.ok) {
-      const users = await res.json();
-      userSearchResults.innerHTML = '';
-      users.forEach(u => {
-        const li = document.createElement('li');
-        li.className = 'search-result-item';
-        li.innerHTML = `<span>${u.avatar}</span> <strong>${escapeHtml(u.username)}</strong>`;
-        li.onclick = async () => {
-          const createRes = await fetch('/api/dms', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ targetUserId: u.id })
-          });
-          if (createRes.ok) {
-            const dmObj = await createRes.json();
-            newDmModal.classList.add('hidden');
-            await loadDms();
-            selectDm(dmObj);
-          }
-        };
-        userSearchResults.appendChild(li);
-      });
-    }
-  });
-
-  // --------------------------------------------------------------------------
-  // CREATE & JOIN SERVER MODALS
-  // --------------------------------------------------------------------------
-  openCreateServerBtn.addEventListener('click', () => createServerModal.classList.remove('hidden'));
-  closeCreateServerBtn.addEventListener('click', () => createServerModal.classList.add('hidden'));
-
-  serverIconOptions.forEach(opt => {
-    opt.addEventListener('click', () => {
-      serverIconOptions.forEach(o => o.classList.remove('selected'));
-      opt.classList.add('selected');
-      selectedServerIcon = opt.dataset.icon;
-    });
-  });
-
-  createServerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = serverNameInput.value.trim();
+    const name = modalNickname.value.trim();
     if (!name) return;
 
-    const res = await fetch('/api/servers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, icon: selectedServerIcon })
+    currentUser.username = name;
+    localStorage.setItem('whisper_user', JSON.stringify(currentUser));
+    nicknameModal.classList.remove('active');
+    connectSocket();
+  });
+
+  // Connect to Socket.io backend
+  function connectSocket() {
+    updateProfileBadge();
+    socket = io();
+
+    socket.on('connect', () => {
+      socket.emit('user:join', currentUser);
     });
 
-    if (res.ok) {
-      const serverObj = await res.json();
-      createServerModal.classList.add('hidden');
-      serverNameInput.value = '';
-      await loadServers();
-      selectServer(serverObj);
-      showToast(`Server created! Invite Code: ${serverObj.invite_code}`);
-    }
-  });
-
-  openJoinServerBtn.addEventListener('click', () => joinServerModal.classList.remove('hidden'));
-  closeJoinServerBtn.addEventListener('click', () => joinServerModal.classList.add('hidden'));
-
-  joinServerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const inviteCode = joinInviteInput.value.trim();
-    if (!inviteCode) return;
-
-    const res = await fetch('/api/servers/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inviteCode })
+    socket.on('user:registered', (userData) => {
+      currentUser.username = userData.username;
+      currentUser.color = userData.color;
+      currentUser.avatar = userData.avatar;
+      updateProfileBadge();
     });
 
-    if (res.ok) {
-      const serverObj = await res.json();
-      joinServerModal.classList.add('hidden');
-      joinInviteInput.value = '';
-      await loadServers();
-      selectServer(serverObj);
-      showToast(`Joined server: ${serverObj.name}`);
-    } else {
-      showToast('Invalid invite code');
-    }
-  });
+    socket.on('chat:history', (history) => {
+      messagesList.innerHTML = '';
+      history.forEach(renderMessage);
+      scrollToBottom();
+    });
 
-  // --------------------------------------------------------------------------
-  // MESSAGING & ATTACHMENTS
-  // --------------------------------------------------------------------------
-  messageForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const text = messageInput.value.trim();
-    if (!text && !currentAttachment) return;
+    socket.on('chat:message', (msg) => {
+      renderMessage(msg);
+      scrollToBottom();
 
-    if (activeView === 'dms' && activeDm) {
-      socket.emit('send_dm_message', {
-        dmId: activeDm.id,
-        targetUserId: activeDm.partner_id,
-        text,
-        attachment: currentAttachment
-      });
-    } else if (activeView === 'server' && activeChannelId) {
-      socket.emit('send_channel_message', {
-        channelId: activeChannelId,
-        text,
-        attachment: currentAttachment
-      });
-    }
-
-    messageInput.value = '';
-    messageInput.style.height = 'auto';
-    clearAttachment();
-  });
-
-  function renderMessages(messages) {
-    messagesContainer.innerHTML = '';
-    if (messages.length === 0) {
-      showWelcome('💬', 'No messages yet', 'Start the conversation!');
-      return;
-    }
-
-    messages.forEach(msg => {
-      const isMine = msg.sender_id === currentUser.id;
-      const group = document.createElement('div');
-      group.className = `msg-group ${isMine ? 'my-msg' : 'friend-msg'}`;
-
-      const avatar = document.createElement('div');
-      avatar.className = 'msg-avatar';
-      avatar.textContent = msg.sender_avatar || '⚡';
-
-      const contentWrapper = document.createElement('div');
-      contentWrapper.className = 'msg-content-wrapper';
-
-      const sender = document.createElement('div');
-      sender.className = 'msg-sender';
-      sender.textContent = isMine ? 'You' : msg.sender_name;
-
-      const bubble = document.createElement('div');
-      bubble.className = 'msg-bubble';
-
-      if (msg.text) {
-        const textSpan = document.createElement('div');
-        textSpan.textContent = msg.text;
-        bubble.appendChild(textSpan);
-      }
-
-      if (msg.attachment) {
-        const att = typeof msg.attachment === 'string' ? JSON.parse(msg.attachment) : msg.attachment;
-        if (att.type === 'image') {
-          const img = document.createElement('img');
-          img.src = att.url;
-          img.className = 'msg-attachment-img';
-          bubble.appendChild(img);
+      if (msg.type === 'user') {
+        if (msg.socketId === socket.id) {
+          playSendSound();
+        } else {
+          playReceiveSound();
         }
       }
-
-      const timeSpan = document.createElement('span');
-      timeSpan.className = 'msg-time';
-      timeSpan.textContent = formatTime(msg.created_at);
-      bubble.appendChild(timeSpan);
-
-      contentWrapper.appendChild(sender);
-      contentWrapper.appendChild(bubble);
-      group.appendChild(avatar);
-      group.appendChild(contentWrapper);
-      messagesContainer.appendChild(group);
     });
 
-    scrollToBottom();
-  }
-
-  function appendMessageToCurrent(msg) {
-    const isMine = msg.sender_id === currentUser.id;
-    const group = document.createElement('div');
-    group.className = `msg-group ${isMine ? 'my-msg' : 'friend-msg'}`;
-
-    const avatar = document.createElement('div');
-    avatar.className = 'msg-avatar';
-    avatar.textContent = msg.sender_avatar || '⚡';
-
-    const contentWrapper = document.createElement('div');
-    contentWrapper.className = 'msg-content-wrapper';
-
-    const sender = document.createElement('div');
-    sender.className = 'msg-sender';
-    sender.textContent = isMine ? 'You' : msg.sender_name;
-
-    const bubble = document.createElement('div');
-    bubble.className = 'msg-bubble';
-
-    if (msg.text) {
-      const textSpan = document.createElement('div');
-      textSpan.textContent = msg.text;
-      bubble.appendChild(textSpan);
-    }
-
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'msg-time';
-    timeSpan.textContent = formatTime(msg.created_at);
-    bubble.appendChild(timeSpan);
-
-    contentWrapper.appendChild(sender);
-    contentWrapper.appendChild(bubble);
-    group.appendChild(avatar);
-    group.appendChild(contentWrapper);
-    messagesContainer.appendChild(group);
-
-    scrollToBottom();
-  }
-
-  // --------------------------------------------------------------------------
-  // SOCKET LISTENERS FOR DMs & CHANNELS
-  // --------------------------------------------------------------------------
-  function setupSocketListeners() {
-    socket.on('new_channel_message', (msg) => {
-      if (activeView === 'server' && activeChannelId === msg.channel_id) {
-        appendMessageToCurrent(msg);
-      }
+    socket.on('users:list', (users) => {
+      renderUsersList(users);
     });
 
-    socket.on('new_dm_message', (msg) => {
-      if (activeView === 'dms' && activeDm && activeDm.id === msg.dm_id) {
-        appendMessageToCurrent(msg);
+    socket.on('users:online_count', (count) => {
+      onlineUsersCount.textContent = count;
+      onlineBadgeMobile.textContent = count;
+    });
+
+    socket.on('user:typing_status', (data) => {
+      if (data.isTyping) {
+        typingText.textContent = `${data.username} печатает...`;
+        typingBanner.classList.remove('hidden');
       } else {
-        loadDms(); // Refresh DMs list
-        playChime(800);
+        typingBanner.classList.add('hidden');
       }
-    });
-
-    socket.on('incoming_call', (data) => {
-      incomingCallData = data;
-      callerAvatarDisplay.textContent = data.callerAvatar;
-      callerNameDisplay.textContent = data.callerName;
-      callTypeLabel.textContent = `Incoming ${data.callType.toUpperCase()} Call...`;
-      incomingCallModal.classList.remove('hidden');
-      startRingtone();
-    });
-
-    socket.on('call_accepted', async ({ answer }) => {
-      stopRingtone();
-      if (peerConnection) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-      }
-    });
-
-    socket.on('ice_candidate', async ({ candidate }) => {
-      if (peerConnection && candidate) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-      }
-    });
-
-    socket.on('call_ended', () => {
-      cleanupCall();
-      showToast('Call ended');
     });
   }
 
-  // --------------------------------------------------------------------------
-  // WEBRTC CALLING LOGIC
-  // --------------------------------------------------------------------------
-  startAudioCallBtn.addEventListener('click', () => initiateCall('audio'));
-  startVideoCallBtn.addEventListener('click', () => initiateCall('video'));
-  startScreenShareBtn.addEventListener('click', () => initiateCall('screen'));
+  function updateProfileBadge() {
+    userBadgeName.textContent = currentUser.username;
+    userBadgeAvatar.textContent = currentUser.avatar;
+    userBadgeAvatar.style.backgroundColor = currentUser.color;
+  }
 
-  acceptCallBtn.addEventListener('click', answerCall);
-  declineCallBtn.addEventListener('click', () => {
-    stopRingtone();
-    incomingCallModal.classList.add('hidden');
-    if (incomingCallData) {
-      socket.emit('end_call', { targetSocketId: incomingCallData.callerId });
-      incomingCallData = null;
-    }
-  });
-
-  async function initiateCall(callType) {
-    if (!activeDm) {
-      showToast('Select a Direct Message user to call!');
+  // --- Render Messages ---
+  function renderMessage(msg) {
+    if (msg.type === 'system') {
+      const sysEl = document.createElement('div');
+      sysEl.className = 'msg-system';
+      sysEl.textContent = msg.text;
+      messagesList.appendChild(sysEl);
       return;
     }
 
-    try {
-      if (callType === 'screen') {
-        localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        localVideo.srcObject = localStream;
-        localVideo.classList.remove('hidden');
-        localAvatarFallback.classList.add('hidden');
-        localLiveBadge.classList.remove('hidden');
-      } else {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: callType === 'video' });
-      }
+    const isSelf = socket && msg.socketId === socket.id;
+    const msgEl = document.createElement('div');
+    msgEl.className = `msg-user ${isSelf ? 'msg-self' : ''}`;
 
-      createPeerConnection();
-      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-
-      socket.emit('call_user', { targetSocketId: activeDm.partner_id, offer, callType });
-      callStage.classList.remove('hidden');
-    } catch (err) {
-      showToast('Could not access camera/mic');
+    let imgHTML = '';
+    if (msg.image) {
+      imgHTML = `<img src="${escapeHTML(msg.image)}" class="msg-img" alt="shared image">`;
     }
-  }
 
-  async function answerCall() {
-    stopRingtone();
-    incomingCallModal.classList.add('hidden');
-    if (!incomingCallData) return;
+    msgEl.innerHTML = `
+      <div class="msg-avatar" style="background-color: ${msg.color}">${escapeHTML(msg.avatar)}</div>
+      <div class="msg-content">
+        <div class="msg-header">
+          <span class="msg-username" style="color: ${isSelf ? '#ffffff' : msg.color}">${escapeHTML(msg.username)}</span>
+          <span class="msg-time">${escapeHTML(msg.time)}</span>
+        </div>
+        <div class="msg-bubble">
+          ${msg.text ? escapeHTML(msg.text) : ''}
+          ${imgHTML}
+        </div>
+      </div>
+    `;
 
-    try {
-      // Default camera OFF on call answer
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      localVideo.classList.add('hidden');
-      localAvatarFallback.classList.remove('hidden');
-
-      createPeerConnection();
-      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-
-      socket.emit('answer_call', { targetSocketId: incomingCallData.callerId, answer });
-      callStage.classList.remove('hidden');
-    } catch (err) {
-      showToast('Could not access microphone');
-    }
-  }
-
-  function createPeerConnection() {
-    peerConnection = new RTCPeerConnection(rtcConfig);
-    peerConnection.onicecandidate = (e) => {
-      if (e.candidate && activeCallPeer) {
-        socket.emit('ice_candidate', { targetSocketId: activeCallPeer, candidate: e.candidate });
-      }
-    };
-    peerConnection.ontrack = (e) => {
-      remoteStream = e.streams[0];
-      remoteVideo.srcObject = remoteStream;
-      if (e.track.kind === 'video') {
-        remoteVideo.classList.remove('hidden');
-        remoteAvatarFallback.classList.add('hidden');
-      }
-    };
-  }
-
-  function cleanupCall() {
-    stopRingtone();
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnection = null;
-    }
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-    }
-    callStage.classList.add('hidden');
-    incomingCallModal.classList.add('hidden');
-  }
-
-  function startRingtone() {
-    playChime(750);
-    ringtoneTimer = setInterval(() => playChime(750), 1200);
-  }
-
-  function stopRingtone() {
-    if (ringtoneTimer) {
-      clearInterval(ringtoneTimer);
-      ringtoneTimer = null;
-    }
-  }
-
-  // UTILITIES
-  function showWelcome(icon, title, desc) {
-    welcomeBanner.classList.remove('hidden');
-    welcomeTitle.textContent = title;
-    welcomeDesc.textContent = desc;
+    messagesList.appendChild(msgEl);
   }
 
   function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
-  function formatTime(isoString) {
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function escapeHtml(str) {
+  function escapeHTML(str) {
     if (!str) return '';
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return str.replace(/[&<>"']/g, (m) => {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+    });
   }
 
-  function showToast(msg) {
-    toastMsg.textContent = msg;
-    toast.classList.remove('hidden');
-    setTimeout(() => toast.classList.add('hidden'), 3000);
+  // --- Users List Renderer ---
+  function renderUsersList(users) {
+    onlineUsersCount.textContent = users.length;
+    onlineBadgeMobile.textContent = users.length;
+    usersList.innerHTML = '';
+
+    users.forEach(u => {
+      const isYou = socket && u.socketId === socket.id;
+      const uEl = document.createElement('div');
+      uEl.className = 'user-item';
+      uEl.innerHTML = `
+        <div class="user-avatar-sm" style="background-color: ${u.color}">
+          ${escapeHTML(u.avatar)}
+          <span class="online-dot"></span>
+        </div>
+        <span class="user-item-name">
+          ${escapeHTML(u.username)} ${isYou ? '<span class="user-item-you">(Вы)</span>' : ''}
+        </span>
+      `;
+      usersList.appendChild(uEl);
+    });
   }
 
-  function playChime(freq = 600) {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.12);
-    } catch (e) {}
+  // --- Send Message Handling ---
+  chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = messageInput.value.trim();
+
+    if (!text && !attachedImageData) return;
+
+    socket.emit('chat:send', {
+      text: text,
+      image: attachedImageData
+    });
+
+    messageInput.value = '';
+    clearAttachment();
+    stopTyping();
+    messageInput.focus();
+  });
+
+  // Typing event listener
+  messageInput.addEventListener('input', () => {
+    if (!socket) return;
+    if (!isTypingSent) {
+      isTypingSent = true;
+      socket.emit('user:typing', true);
+    }
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(stopTyping, 2000);
+  });
+
+  // Send on Enter (Shift+Enter for new line)
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      chatForm.dispatchEvent(new Event('submit'));
+    }
+  });
+
+  function stopTyping() {
+    if (isTypingSent && socket) {
+      isTypingSent = false;
+      socket.emit('user:typing', false);
+    }
   }
-});
+
+  // --- Image Upload Handling ---
+  btnAttachImage.addEventListener('click', () => imageInput.click());
+
+  imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('Файл слишком большой! Пожалуйста выберите картинку до 3 МБ.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      attachedImageData = evt.target.result;
+      previewImg.src = attachedImageData;
+      attachmentPreview.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  btnRemoveAttachment.addEventListener('click', clearAttachment);
+
+  function clearAttachment() {
+    attachedImageData = null;
+    imageInput.value = '';
+    attachmentPreview.classList.add('hidden');
+    previewImg.src = '';
+  }
+
+  // --- Emoji Picker ---
+  btnToggleEmoji.addEventListener('click', () => {
+    emojiPicker.classList.toggle('hidden');
+  });
+
+  emojiPicker.addEventListener('click', (e) => {
+    if (e.target.tagName === 'SPAN') {
+      messageInput.value += e.target.textContent;
+      emojiPicker.classList.add('hidden');
+      messageInput.focus();
+    }
+  });
+
+  // Close emoji picker on click outside
+  document.addEventListener('click', (e) => {
+    if (!emojiPicker.contains(e.target) && e.target !== btnToggleEmoji) {
+      emojiPicker.classList.add('hidden');
+    }
+  });
+
+  // Sound toggle
+  btnToggleSound.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundIcon.textContent = soundEnabled ? '🔔' : '🔕';
+  });
+
+  // Mobile sidebar toggle
+  btnToggleUsers.addEventListener('click', () => {
+    usersSidebar.classList.toggle('active');
+  });
+
+  // --- Edit Profile Modal ---
+  btnEditProfile.addEventListener('click', () => {
+    editNickname.value = currentUser.username;
+    renderEditProfileGrids();
+    profileModal.classList.add('active');
+  });
+
+  btnCancelEdit.addEventListener('click', () => {
+    profileModal.classList.remove('active');
+  });
+
+  function renderEditProfileGrids() {
+    editAvatarGrid.innerHTML = avatarGrid.innerHTML;
+    editColorPickerList.innerHTML = colorPickerList.innerHTML;
+
+    let selectedAvatar = currentUser.avatar;
+    let selectedColor = currentUser.color;
+
+    setupSelectorGrid(editAvatarGrid, 'avatar', (val) => selectedAvatar = val);
+    setupSelectorGrid(editColorPickerList, 'color', (val) => selectedColor = val);
+
+    editProfileForm.onsubmit = (e) => {
+      e.preventDefault();
+      const newName = editNickname.value.trim();
+      if (!newName) return;
+
+      currentUser.username = newName;
+      currentUser.avatar = selectedAvatar;
+      currentUser.color = selectedColor;
+
+      localStorage.setItem('whisper_user', JSON.stringify(currentUser));
+      if (socket) {
+        socket.emit('user:update_profile', currentUser);
+      }
+      profileModal.classList.remove('active');
+    };
+  }
+
+  // Run initial setup
+  init();
+
+})();
